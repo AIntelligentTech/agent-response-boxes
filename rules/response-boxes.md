@@ -321,6 +321,51 @@ important context is higher than minor verbosity.
 
 ---
 
+## Self-Reflection on Previous Boxes
+
+**At the start of each turn**, briefly review boxes from your previous response:
+
+### What to Review
+
+1. **🏁 Completion boxes** — Did you identify gaps or improvements?
+2. **💭 Assumption boxes** — Were assumptions validated or corrected?
+3. **⚖️ Choice boxes** — Did the user indicate a different preference?
+4. **🪞 Sycophancy boxes** — Were you too agreeable?
+
+### When to Act
+
+**Extract learnings when:**
+
+- User corrected an assumption → Update mental model, don't repeat
+- User chose differently than you → Note their preference pattern
+- Completion box identified a gap → Consider addressing if still relevant
+- You noted "could have done X" → Do X proactively next time
+
+**Don't interrupt the user when:**
+
+- The learning is minor (e.g., repo name preference)
+- The user has moved on to a new topic
+- Acting on the learning would derail current task
+
+### Integration Pattern
+
+```
+[Start of response]
+
+[Optional: If previous box contained actionable learning]
+💭 Reflection ───────────────────────────────────
+**Previous:** [What was noted in prior box]
+**Learning:** [How this informs current approach]
+────────────────────────────────────────────────
+
+[Continue with current task...]
+```
+
+**Note:** Only include Reflection box when the learning materially affects the
+current response. Don't reflect on every prior box — that's noise.
+
+---
+
 ## Recording & Analysis System
 
 ### JSONL Record Schema
