@@ -4,7 +4,7 @@
 > into AI reasoning, decisions, and self-assessment.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](https://github.com/AIntelligentTech/claude-response-boxes/releases)
+[![Version](https://img.shields.io/badge/version-1.1.0-green.svg)](https://github.com/AIntelligentTech/claude-response-boxes/releases)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-Compatible-blueviolet.svg)](https://claude.ai/claude-code)
 
 ---
@@ -15,6 +15,7 @@
   inline
 - **Anti-Sycophancy** — Built-in self-assessment prevents hollow validation
 - **Task Completion Checks** — Forced reassessment ensures nothing is missed
+- **Meta-Cognition Loop** — Self-reflection on prior boxes enables learning
 - **Analytics Pipeline** — Track patterns across sessions with JSONL storage
 - **Zero Config** — One-line install, works immediately
 - **Git-Portable** — Context uses git remotes, not filesystem paths
@@ -56,6 +57,38 @@ in prose.
 
 ---
 
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        RESPONSE BOX META-COGNITION SYSTEM                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐  │
+│  │   GENERATE  │───▶│   COLLECT   │───▶│    STORE    │───▶│   ANALYZE   │  │
+│  │             │    │             │    │             │    │             │  │
+│  │ Claude adds │    │ Hook parses │    │   JSONL     │    │  Patterns   │  │
+│  │ boxes to    │    │ boxes from  │    │  appended   │    │  extracted  │  │
+│  │ response    │    │ response    │    │             │    │             │  │
+│  └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘  │
+│         │                                                        │          │
+│         │                    ┌─────────────┐                     │          │
+│         │                    │   REFLECT   │                     │          │
+│         └───────────────────▶│             │◀────────────────────┘          │
+│                              │ Claude      │                                │
+│                              │ reviews     │                                │
+│                              │ prior boxes │                                │
+│                              └─────────────┘                                │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+The system forms a **meta-cognition loop**: Claude generates boxes → hook
+collects them → JSONL stores them → analysis extracts patterns → Claude reflects
+on prior boxes to inform current response.
+
+---
+
 ## Box Types
 
 ### Inline Boxes (at point of relevance)
@@ -70,6 +103,7 @@ in prose.
 | ⚠️    | Concern    | Potential risk to flag           |
 | 💡    | Suggestion | Optional improvement             |
 | 🚨    | Warning    | Serious risk requiring attention |
+| 🔄    | Reflection | Applied learning from prior box  |
 
 ### End-of-Response Boxes (max 3, in order)
 

@@ -29,7 +29,8 @@ ANALYTICS_FILE="${BOX_ANALYTICS_FILE:-${ANALYTICS_DIR}/boxes.jsonl}"
 
 # Box patterns to detect (emoji at start of line)
 # Note: These are the standard box emojis from the spec
-BOX_PATTERNS='⚖️|🎯|💭|📊|↩️|⚠️|💡|🚨|🪞|✅|📋|🏁'
+# Updated v1.1.0: Added 🔄 Reflection box
+BOX_PATTERNS='⚖️|🎯|💭|📊|↩️|⚠️|💡|🚨|🪞|✅|📋|🏁|🔄'
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Context Gathering (git-based, portable)
@@ -110,6 +111,7 @@ emoji_to_type() {
         "✅") echo "Quality" ;;
         "📋") echo "FollowUps" ;;
         "🏁") echo "Completion" ;;
+        "🔄") echo "Reflection" ;;
         *) echo "Unknown" ;;
     esac
 }
@@ -169,7 +171,7 @@ process_response() {
 
     while IFS= read -r line; do
         # Check for box start (emoji followed by type and dashes)
-        if [[ "$line" =~ ^(⚖️|🎯|💭|📊|↩️|⚠️|💡|🚨|🪞|✅|📋|🏁)[[:space:]].*─+ ]]; then
+        if [[ "$line" =~ ^(⚖️|🎯|💭|📊|↩️|⚠️|💡|🚨|🪞|✅|📋|🏁|🔄)[[:space:]].*─+ ]]; then
             # If we were already in a box, save the previous one
             if [[ "$in_box" == "true" ]] && [[ -n "$current_box" ]]; then
                 save_box "$current_emoji" "$current_box" "$timestamp" "$session_id" "$git_remote" "$git_branch" "$turn_number"

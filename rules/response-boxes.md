@@ -2,7 +2,110 @@
 
 **ALWAYS ACTIVE** — Apply these boxes to every substantive response.
 
-**Version:** 1.0.0
+**Version:** 1.1.0
+
+---
+
+## System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        RESPONSE BOX META-COGNITION SYSTEM                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐  │
+│  │   GENERATE  │───▶│   COLLECT   │───▶│    STORE    │───▶│   ANALYZE   │  │
+│  │             │    │             │    │             │    │             │  │
+│  │ Claude adds │    │ Hook parses │    │   JSONL     │    │  Patterns   │  │
+│  │ boxes to    │    │ boxes from  │    │  appended   │    │  extracted  │  │
+│  │ response    │    │ response    │    │             │    │             │  │
+│  └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘  │
+│         │                                                        │          │
+│         │                    ┌─────────────┐                     │          │
+│         │                    │   REFLECT   │                     │          │
+│         └───────────────────▶│             │◀────────────────────┘          │
+│                              │ Claude      │                                │
+│                              │ reviews     │                                │
+│                              │ prior boxes │                                │
+│                              └─────────────┘                                │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Single-Turn Execution Flow
+
+```
+User Request
+     │
+     ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│                           CLAUDE PROCESSING                                 │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  1. REVIEW (turn start)          2. EXECUTE                  3. ANNOTATE  │
+│  ┌────────────────────┐          ┌─────────────────┐        ┌──────────┐  │
+│  │ Check prior boxes: │          │ Perform task:   │        │ Add end  │  │
+│  │ • Was assumption   │─────────▶│ • Code changes  │───────▶│ boxes:   │  │
+│  │   corrected?       │          │ • Research      │        │ • 📋     │  │
+│  │ • Did user pick    │          │ • Analysis      │        │ • 🏁     │  │
+│  │   different choice?│          │                 │        │ • 🪞     │  │
+│  │ • Any gaps noted?  │          │ [Inline boxes   │        │          │  │
+│  └────────────────────┘          │  as relevant]   │        └──────────┘  │
+│           │                      │ ⚖️ 🎯 💭 📊 ↩️    │              │       │
+│           │                      └─────────────────┘              │       │
+│           │                             │                         │       │
+│           ▼                             ▼                         ▼       │
+│  ┌─────────────────────────────────────────────────────────────────────┐  │
+│  │                         RESPONSE OUTPUT                              │  │
+│  │  [Optional: 🔄 Reflection if learning applied]                       │  │
+│  │  [Content with inline boxes]                                         │  │
+│  │  [End boxes: 📋 → 🏁 → 🪞]                                            │  │
+│  └─────────────────────────────────────────────────────────────────────┘  │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
+     │
+     ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│                         POST-RESPONSE HOOK                                  │
+├────────────────────────────────────────────────────────────────────────────┤
+│  collect-boxes.sh:                                                         │
+│  1. Parse response for emoji patterns (⚖️|🎯|💭|...)                        │
+│  2. Extract fields (**Field:** Value)                                      │
+│  3. Gather context (git remote, branch, session)                           │
+│  4. Append JSON record to boxes.jsonl                                      │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Multi-Turn Meta-Cognition Loop
+
+```
+Turn N                              Turn N+1                          Turn N+2
+┌─────────┐                        ┌─────────┐                        ┌─────────┐
+│ Request │                        │ Request │                        │ Request │
+└────┬────┘                        └────┬────┘                        └────┬────┘
+     │                                  │                                  │
+     ▼                                  ▼                                  ▼
+┌─────────┐                        ┌─────────┐                        ┌─────────┐
+│Response │                        │Response │                        │Response │
+│with     │                        │with     │                        │with     │
+│boxes:   │                        │boxes:   │                        │boxes:   │
+│         │                        │         │                        │         │
+│💭 Assume│───────────────────────▶│🔄 Prior │                        │         │
+│  "X"    │  Claude remembers      │  assumption                      │         │
+│         │  the assumption        │  corrected!│                     │         │
+│🏁 Could │                        │         │───────────────────────▶│ Applied │
+│  improve│───────────────────────▶│ Apply   │  Learning persists     │ learning│
+│  by Y   │  Claude remembers      │ learning│                        │         │
+│         │  self-critique         │ Y       │                        │         │
+└─────────┘                        └─────────┘                        └─────────┘
+     │                                  │                                  │
+     ▼                                  ▼                                  ▼
+[boxes.jsonl]                      [boxes.jsonl]                      [boxes.jsonl]
+```
+
+**Current Limitation:** The reflection loop relies on Claude's conversational
+memory. In long sessions or across sessions, prior boxes may not be available
+for review. The JSONL storage enables future tooling to inject prior boxes.
 
 ---
 
@@ -19,6 +122,7 @@
 | 💡    | Suggestion | Optional improvement                 | Inline    |
 | 🚨    | Warning    | Serious risk                         | Inline    |
 | ★     | Insight    | Educational point (explanatory mode) | Inline    |
+| 🔄    | Reflection | Applied learning from prior box      | Start     |
 | 🪞    | Sycophancy | Anti-sycophancy check                | End       |
 | ✅    | Quality    | Code quality assessment              | End       |
 | 📋    | Follow Ups | Next steps for user                  | End       |
@@ -192,6 +296,22 @@ Likelihood, Consequence
 
 Note: Uses backticks per existing convention.
 
+#### 🔄 Reflection
+
+**When:** Applying a learning from a prior box (assumption corrected, choice
+validated, gap addressed) **Fields:** Prior, Learning, Application
+
+```
+🔄 Reflection ───────────────────────────────────
+**Prior:** [What was noted in previous box]
+**Learning:** [What was learned from outcome]
+**Application:** [How it affects current response]
+────────────────────────────────────────────────
+```
+
+**Placement:** Start of response (after greeting if any, before main content).
+Only use when the learning materially affects the current response.
+
 ---
 
 ### End-of-Response Boxes
@@ -323,46 +443,92 @@ important context is higher than minor verbosity.
 
 ## Self-Reflection on Previous Boxes
 
-**At the start of each turn**, briefly review boxes from your previous response:
+### How Self-Reflection Works
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         SELF-REFLECTION MECHANISM                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  DATA SOURCE: Conversational Memory (within current session)               │
+│                                                                             │
+│  ┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐   │
+│  │   Your Prior     │     │   User's Next    │     │  Check: Did user │   │
+│  │   Response       │────▶│   Message        │────▶│  correct/validate│   │
+│  │   (with boxes)   │     │                  │     │  /redirect?      │   │
+│  └──────────────────┘     └──────────────────┘     └────────┬─────────┘   │
+│                                                              │              │
+│                           ┌──────────────────────────────────┼──────────┐  │
+│                           │                                  ▼          │  │
+│                           │  YES: User corrected    NO: Proceed normally│  │
+│                           │       assumption or            │            │  │
+│                           │       chose differently        │            │  │
+│                           │              │                 │            │  │
+│                           │              ▼                 │            │  │
+│                           │  ┌─────────────────────┐       │            │  │
+│                           │  │ 🔄 Reflection Box   │       │            │  │
+│                           │  │ at response start   │       │            │  │
+│                           │  └─────────────────────┘       │            │  │
+│                           └─────────────────────────────────────────────┘  │
+│                                                                             │
+│  LIMITATION: Only works within active session. Cross-session reflection    │
+│  requires external tooling (future: prior-box injection).                  │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**At the start of each turn**, briefly review boxes from your previous response
+using your conversational memory:
 
 ### What to Review
 
-1. **🏁 Completion boxes** — Did you identify gaps or improvements?
-2. **💭 Assumption boxes** — Were assumptions validated or corrected?
-3. **⚖️ Choice boxes** — Did the user indicate a different preference?
-4. **🪞 Sycophancy boxes** — Were you too agreeable?
+| Prior Box     | Check For                         | Action                               |
+| ------------- | --------------------------------- | ------------------------------------ |
+| 🏁 Completion | "Gaps" or "Could Improve" filled? | Address if still relevant            |
+| 💭 Assumption | User corrected or confirmed?      | Update approach, use 🔄 Reflection   |
+| ⚖️ Choice     | User preferred alternative?       | Note preference, use 🔄 Reflection   |
+| 📊 Confidence | Claim was wrong?                  | Correct, increase epistemic humility |
+| 🪞 Sycophancy | Rating was low?                   | Be more direct this turn             |
 
-### When to Act
+### When to Use 🔄 Reflection Box
 
-**Extract learnings when:**
+**USE when:**
 
-- User corrected an assumption → Update mental model, don't repeat
-- User chose differently than you → Note their preference pattern
-- Completion box identified a gap → Consider addressing if still relevant
-- You noted "could have done X" → Do X proactively next time
+- User explicitly corrected an assumption → Show you learned
+- User chose differently than you selected → Acknowledge preference
+- Completion "Could Improve" directly applies → Show proactive improvement
+- Pattern emerges across multiple corrections → Synthesize the learning
 
-**Don't interrupt the user when:**
+**DON'T USE when:**
 
-- The learning is minor (e.g., repo name preference)
-- The user has moved on to a new topic
-- Acting on the learning would derail current task
+- Learning is minor (repo name, formatting preference)
+- User has moved on to unrelated topic
+- Reflection would delay urgent task
+- Same learning already reflected in prior turn
 
 ### Integration Pattern
 
 ```
 [Start of response]
 
-[Optional: If previous box contained actionable learning]
-💭 Reflection ───────────────────────────────────
-**Previous:** [What was noted in prior box]
-**Learning:** [How this informs current approach]
+🔄 Reflection ───────────────────────────────────
+**Prior:** In my last response, I assumed TypeScript
+**Learning:** You prefer JavaScript for this project
+**Application:** Using JavaScript for all examples below
 ────────────────────────────────────────────────
 
-[Continue with current task...]
+[Continue with current task using learned preference...]
+
+[End boxes as normal]
 ```
 
-**Note:** Only include Reflection box when the learning materially affects the
-current response. Don't reflect on every prior box — that's noise.
+### Cross-Session Continuity
+
+Within a session, use conversational memory. For cross-session learnings:
+
+1. **Persistent rules** — Extract to CLAUDE.md if pattern repeats 3+ times
+2. **Analytics review** — Run `analyze-boxes.sh` to spot patterns
+3. **Future tooling** — Prior-box injection will enable automatic context
 
 ---
 
@@ -487,4 +653,11 @@ jq -s '[.[] | select(.type=="Pushback")] | length' ~/.claude/analytics/boxes.jso
 
 ## Changelog
 
+- **v1.1.0** (2026-01-21): Meta-cognition loop refinements
+  - Added System Architecture diagram
+  - Added Single-Turn Execution Flow diagram
+  - Added Multi-Turn Meta-Cognition Loop diagram
+  - Added 🔄 Reflection box for applying learnings from prior boxes
+  - Enhanced Self-Reflection section with mechanism diagram and decision tables
+  - Documented cross-session continuity guidance
 - **v1.0.0** (2026-01-21): Initial release
