@@ -2,7 +2,54 @@
 
 **ALWAYS ACTIVE** — Apply these boxes to every substantive response.
 
-**Version:** 1.1.0
+**Version:** 2.0.0
+
+---
+
+## ACTIVE ENFORCEMENT
+
+**This system uses hooks to ENFORCE compliance, not just document
+expectations.**
+
+### Pre-Response Checklist (MANDATORY)
+
+**STOP. Before completing ANY substantive response, verify:**
+
+```
+□ 1. Did I select between alternatives?
+     → YES: Add ⚖️ Choice box (Selected, Alternatives, Reasoning)
+
+□ 2. Did I make a judgment call without clear alternatives?
+     → YES: Add 🎯 Decision box (What, Reasoning)
+
+□ 3. Did I fill in something the user didn't specify?
+     → YES: Add 💭 Assumption box (What, Basis)
+
+□ 4. Did I explain WHY, not just WHAT?
+     → NO: Add reasoning. "I did X because Y" not just "I did X"
+
+□ 5. Is this a substantive response (>300 chars, not simple confirmation)?
+     → YES: Add 🪞 Sycophancy box at end
+```
+
+**FAILURE TO COMPLETE THIS CHECKLIST = INCOMPLETE RESPONSE**
+
+### Enforcement Hooks
+
+| Hook                     | Trigger      | Action                                         |
+| ------------------------ | ------------ | ---------------------------------------------- |
+| `validate-response.sh`   | Stop         | Blocks completion if missing required elements |
+| `enforce-reminder.sh`    | PostToolUse  | Injects reminder every 3rd tool call           |
+| `session-end-analyze.sh` | SessionEnd   | Scores boxes, updates index, runs analysis     |
+| `inject-context.sh`      | SessionStart | Loads high-value prior boxes as context        |
+
+### What Gets Blocked
+
+The Stop hook will block completion if:
+
+- Substantive response (>300 chars) missing 🪞 Sycophancy box
+- No reasoning patterns detected AND no inline boxes present
+- (Strict mode) Missing reasoning explanation
 
 ---
 
@@ -653,6 +700,16 @@ jq -s '[.[] | select(.type=="Pushback")] | length' ~/.claude/analytics/boxes.jso
 
 ## Changelog
 
+- **v2.0.0** (2026-01-21): Active enforcement architecture
+  - Added ACTIVE ENFORCEMENT section with mandatory pre-response checklist
+  - Added validate-response.sh Stop hook for compliance enforcement
+  - Added enforce-reminder.sh PostToolUse hook for context injection
+  - Added session-end-analyze.sh for box scoring and indexing
+  - Added inject-context.sh SessionStart hook for prior box injection
+  - Added box scoring system with configurable weights
+  - Added headless Claude integration for deep session analysis
+  - Added box-index.json for high-value box storage
+  - Upgraded from passive documentation to active enforcement
 - **v1.1.0** (2026-01-21): Meta-cognition loop refinements
   - Added System Architecture diagram
   - Added Single-Turn Execution Flow diagram
