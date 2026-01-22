@@ -32,7 +32,7 @@ If a learning applies, start your response with a 🔄 Reflection box.
 
 Before completing any substantive response (>300 characters):
 
-```
+```text
 [ ] Selected between alternatives?      → ⚖️ Choice
 [ ] Made a judgment call?               → 🎯 Decision
 [ ] Filled unstated requirement?        → 💭 Assumption
@@ -71,7 +71,7 @@ Before completing any substantive response (>300 characters):
 
 ## Box Format
 
-```
+```text
 [emoji] [Type] ─────────────────────────────────
 **Field1:** Value
 **Field2:** Value
@@ -145,11 +145,16 @@ When uncertain whether a box is warranted, include it.
 
 At session start, you may receive context with two types of information:
 
+### Terminology
+
+- **Recent Notable Boxes** are raw evidence from past sessions
+- **Patterns** are synthesized learnings (and sometimes meta-learnings) derived from many boxes
+
 ### Patterns (AI-Synthesized Learnings)
 
 These are patterns identified by AI analysis across multiple sessions:
 
-```
+```text
 ## Patterns (from cross-session analysis)
 • [HIGH] User prefers Zod for validation (92% confidence, 5 evidence)
 • [MEDIUM] This repo uses functional patterns (78% confidence, repo-specific)
@@ -161,7 +166,7 @@ Apply these learnings proactively. If directly relevant, use 🔄 Reflection.
 
 These are high-value boxes from recent sessions:
 
-```
+```text
 ## Recent Notable Boxes
 • Assumption: Assumed "PostgreSQL" [github.com/user/api] (2 days ago)
 • Warning: No rate limiting on public endpoints [github.com/user/api]
@@ -175,7 +180,7 @@ Review these for relevant context. Apply if the current task relates.
 
 To synthesize learnings from collected boxes, run:
 
-```
+```text
 /analyze-boxes
 ```
 

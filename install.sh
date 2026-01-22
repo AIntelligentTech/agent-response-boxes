@@ -383,10 +383,66 @@ report_status() {
 
 snippet_exists() {
     local file="$1"
-    if [[ -f "$file" ]] && grep -q "Response Box System" "$file"; then
+    if [[ -f "$file" ]] && grep -Eq '^#{2,6}[[:space:]]+Response Box System([[:space:]].*)?$' "$file"; then
         return 0
     fi
     return 1
+}
+
+replace_snippet_block() {
+    local claude_md="$1"
+    local snippet_file="$2"
+    local tmp_out
+    tmp_out="$(mktemp)"
+
+    awk -v snip="$snippet_file" '
+        function print_snippet_body() {
+            # Insert snippet content but preserve the existing CLAUDE.md heading line.
+            # Skip snippet front-matter separator and its own heading.
+            skip_separator = 1
+            while ((getline line < snip) > 0) {
+                if (skip_separator == 1 && line ~ /^---[[:space:]]*$/) {
+                    continue
+                }
+                skip_separator = 0
+                if (line ~ /^##[[:space:]]+Response Box System([[:space:]].*)?$/) {
+                    continue
+                }
+                print line
+            }
+            close(snip)
+        }
+        BEGIN { in_block = 0; replaced = 0 }
+        {
+            if (in_block == 0 && replaced == 0 && $0 ~ /^#{2,6}[[:space:]]+Response Box System([[:space:]].*)?$/) {
+                in_block = 1
+                replaced = 1
+                # Preserve the existing heading line (may include suffix like (MANDATORY)).
+                print $0
+                print_snippet_body()
+                next
+            }
+
+            if (in_block == 1) {
+                # Prefer a tight end marker that matches the current snippet template.
+                if ($0 ~ /^[[:space:]]*Skip.*boxes for:/) {
+                    in_block = 0
+                    next
+                }
+
+                # Fallback: end the block at the next top-level section.
+                if ($0 ~ /^#+[[:space:]]+/ && $0 !~ /^#{2,6}[[:space:]]+Response Box System([[:space:]].*)?$/) {
+                    in_block = 0
+                } else {
+                    next
+                }
+            }
+
+            print $0
+        }
+    ' "$claude_md" > "$tmp_out"
+
+    mv "$tmp_out" "$claude_md"
 }
 
 check_jq() {
@@ -539,15 +595,22 @@ install_claude_md_snippet() {
         scope_label="Project"
     fi
 
+    local snippet_tmp
+    snippet_tmp="$(fetch_to_temp "config/claude-md-snippet.md")"
+
     if snippet_exists "$claude_md"; then
-        info "Response Box snippet already in CLAUDE.md, skipping..."
-        return
+        log "Updating Response Box snippet in CLAUDE.md..."
+    else
+        log "Adding snippet to CLAUDE.md..."
     fi
 
-    log "Adding snippet to CLAUDE.md..."
-
     if [[ "$DRY_RUN" == "true" ]]; then
-        info "Would update: $claude_md"
+        if snippet_exists "$claude_md"; then
+            info "Would replace snippet block in: $claude_md"
+        else
+            info "Would append snippet to: $claude_md"
+        fi
+        rm -f "$snippet_tmp"
         return 0
     fi
 
@@ -558,13 +621,15 @@ install_claude_md_snippet() {
         backup_if_exists "$claude_md"
     fi
 
-    if [[ "${SOURCE}" == "local" ]]; then
-        cat "${SOURCE_DIR}/config/claude-md-snippet.md" >> "$claude_md"
+    if snippet_exists "$claude_md"; then
+        replace_snippet_block "$claude_md" "$snippet_tmp"
+        log "  → Updated snippet in ${claude_md}"
     else
-        curl -fsSL "${RAW_URL}/config/claude-md-snippet.md" >> "$claude_md"
+        cat "$snippet_tmp" >> "$claude_md"
+        log "  → Added snippet to ${claude_md}"
     fi
 
-    log "  → Added snippet to ${claude_md}"
+    rm -f "$snippet_tmp"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────

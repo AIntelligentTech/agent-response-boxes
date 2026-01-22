@@ -8,7 +8,7 @@
 
 Before completing any substantive response (>300 chars):
 
-```
+```text
 [ ] Selected between alternatives?      → ⚖️ Choice
 [ ] Made a judgment call?               → 🎯 Decision
 [ ] Filled unstated requirement?        → 💭 Assumption
@@ -37,6 +37,12 @@ At turn start, review prior boxes:
 - 🏁 Completion with "Gaps"/"Improve" → Address if relevant
 - 💭 Assumption corrected by user → Use 🔄 Reflection
 - ⚖️ Choice where user preferred alternative → Use 🔄 Reflection
+
+### Cross-Session Context (when injected)
+
+- **Patterns** are synthesized **learnings** (and sometimes **meta-learnings**) derived from many prior boxes.
+- **Recent Notable Boxes** are raw **evidence** from past sessions.
+- When either affects your approach, start with a 🔄 Reflection box.
 
 **Verbosity:** Prefer more boxes over fewer. Missing context is worse than
 noise.

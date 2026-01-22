@@ -37,11 +37,17 @@ When a learning applies to the current response, start with a 🔄 Reflection bo
 
 At session start, context may be injected containing:
 
-**Patterns (AI-Synthesized Learnings)**
+#### Terminology
+
+- **Boxes** are raw, turn-level evidence captured during a session
+- **Learnings** are synthesized patterns derived from many boxes
+- **Meta-learnings** are higher-level principles that synthesize multiple learnings
+
+#### Patterns (AI-Synthesized Learnings)
 
 Learnings identified by AI analysis across multiple sessions:
 
-```
+```text
 ## Patterns (from cross-session analysis)
 • [HIGH] User prefers Zod for validation (92% confidence, 5 evidence)
 • [MEDIUM] This repo uses functional patterns (78% confidence, repo-specific)
@@ -49,11 +55,11 @@ Learnings identified by AI analysis across multiple sessions:
 
 These represent synthesized insights from multiple boxes. Apply proactively.
 
-**Recent Notable Boxes**
+#### Recent Notable Boxes
 
 High-value boxes from recent sessions with recency decay:
 
-```
+```text
 ## Recent Notable Boxes
 • Assumption: Assumed "PostgreSQL" [github.com/user/api] (2 days ago)
 • Warning: No rate limiting on public endpoints [github.com/user/api]

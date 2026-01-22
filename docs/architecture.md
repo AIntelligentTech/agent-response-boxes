@@ -12,10 +12,23 @@ event-sourced metacognitive framework for Claude Code.
 The Response Box System provides:
 
 1. **Transparent reasoning** — Structured boxes surface hidden decisions
-2. **Cross-session learning** — Patterns extracted from boxes persist and
-   improve
-3. **Continuous refinement** — AI-powered analysis synthesizes higher-level
-   insights
+2. **Within-session metacognition** — Boxes make assumptions/choices explicit in
+   the same thread, enabling immediate self-correction while context is fresh
+3. **Cross-session self-learning** — High-signal boxes persist as an event log;
+   analysis converts them into durable patterns that can be reinjected later
+4. **Continuous refinement** — AI-powered analysis synthesizes higher-level
+   insights and updates them as new evidence arrives
+
+The knowledge model is intentionally three-tier:
+
+- **Boxes** — Raw, turn-level evidence captured during a session
+- **Learnings** — Patterns synthesized from many boxes (typically `level: 0`)
+- **Meta-learnings** — Higher-level principles that synthesize multiple learnings
+  (typically `level: 1+`)
+
+For operational setup and workflow guidance (output style, rules, CLAUDE.md, hooks,
+and skill design), see **Best Practices: Integrating with Claude Code** in the
+project `README.md`.
 
 ---
 
@@ -630,9 +643,9 @@ issues:
 
 **Solution:** `LearningLinked` with `level` field:
 
-- Level 0: Direct patterns from boxes
-- Level 1+: Meta-learnings synthesizing lower levels
-- Hierarchy enables richer context injection
+- Level 0: Direct patterns from boxes (base learnings)
+- Level 1+: Meta-learnings that synthesize multiple level-0 learnings
+- Hierarchy enables richer context injection (meta-learnings first, then specifics)
 
 ### Why Strength and Relationship?
 

@@ -48,14 +48,21 @@ are now visible and reviewable.
 
 ### 2. Self-Reflection
 
-The completion box forces Claude to reassess its work before finishing. "Did I
+This is **within-session metacognition**: Claude is forced to audit its own work
+in the same thread, while it can still correct course.
+
+The completion box forces Claude to reassess its work before finishing: "Did I
 actually address the request? What gaps remain? How could I have done better?"
 
 ### 3. Cross-Session Learning
 
-High-value boxes (corrected assumptions, validated choices, warnings that proved
-right) are collected and injected into future sessions. Claude learns from past
-mistakes.
+This is **cross-session self-learning**: high-value boxes (corrected
+assumptions, validated choices, warnings that proved right) are persisted as an
+event log and used as durable training signal.
+
+Boxes become **evidence**. `/analyze-boxes` synthesizes them into reusable
+**learnings** and higher-level **meta-learnings**, which are then injected at
+the start of future sessions so Claude can avoid repeating the same mistakes.
 
 ### 4. Anti-Sycophancy
 
@@ -90,12 +97,22 @@ The system operates in three layers:
 
 ### Metacognition Loop
 
-**Within-session:** At each turn start, Claude reviews prior boxes for
-corrections, gaps, or learnings to apply.
+**Within-session (metacognition):** During a single conversation, boxes act as
+local state. Claude uses them to surface assumptions/decisions as they happen
+and to self-correct before moving on. When applying something learned earlier in
+the same session, it records that application with a 🔄 Reflection box.
 
-**Cross-session:** High-value boxes and synthesized learnings are projected from
-the event store and injected as context at the start of new sessions, enabling
-Claude to learn from past mistakes.
+**Cross-session (self-learning):** Between conversations, Claude can't “remember”
+unless the system persists and reinjects context. This system does that by
+turning prior work into a three-tier knowledge model:
+
+- **Boxes** — Raw, turn-level evidence (what was chosen/assumed/warned).
+- **Learnings** — Synthesized patterns extracted from many boxes.
+- **Meta-learnings** — Higher-level principles that synthesize multiple learnings.
+
+At session start, high-value boxes plus the most relevant learnings/meta-learnings
+are projected from the event store and injected as context, enabling Claude to
+apply past corrections and preferences immediately.
 
 ---
 
@@ -231,7 +248,8 @@ Or set as default in `~/.claude/settings.json`:
    for response boxes and appends `BoxCreated` events to the event store.
 
 2. **Synthesis** — When you run `/analyze-boxes`, Claude proposes and (with your
-   approval) appends learning events (e.g. `LearningCreated`, `EvidenceLinked`).
+   approval) appends learning events (e.g. `LearningCreated`, `EvidenceLinked`) and
+   can link learnings into meta-learnings (e.g. `LearningLinked`).
 
 3. **Injection** — At session start, `inject-context.sh` loads relevant boxes
    and learnings via projection from the event store and injects them as
@@ -395,6 +413,80 @@ Hook registration in `~/.claude/settings.json`:
   }
 }
 ```
+
+---
+
+## Best Practices: Integrating with Claude Code
+
+To get maximum benefit, integrate response boxes across **output style**, **rules**,
+**CLAUDE.md**, **hooks**, and **skills** so the metacognition loop is end-to-end.
+
+### 1. Use the Response Box output style
+
+- **Goal:** Make boxes the default response format so reasoning is consistently captured.
+- **Action:** Set output style to `response-box` (either per-session with `/output-style response-box`
+  or as a default in `~/.claude/settings.json`).
+
+### 2. Keep the spec authoritative (rules)
+
+- **Goal:** Avoid drift between “how we write boxes” and “how we parse/analyze them”.
+- **Action:** Treat the Response Box spec (`response-boxes.md`, installed at `~/.claude/rules/response-boxes.md`
+  or project `.claude/rules/response-boxes.md`) as the single source of truth for:
+  - **Box formats/fields** (so hooks can parse reliably)
+  - **When boxes are required** (so the event store has consistent signal)
+
+### 3. Wire CLAUDE.md so every session starts with the right mindset
+
+- **Goal:** Make “review prior boxes + apply learnings” a first-class pre-response habit.
+- **Action:** Add the snippet (`config/claude-md-snippet.md`) to your project’s Claude instructions
+  (commonly `.claude/CLAUDE.md`, or `CLAUDE.md` depending on how you run Claude Code).
+- **Recommendation:** Keep project-specific constraints adjacent to the snippet, for example:
+  - Dependency/package manager expectations
+  - Build/test commands
+  - Coding standards (TypeScript strict, formatting, etc.)
+
+### 4. Turn cross-session learning on (hooks)
+
+- **Goal:** Persist evidence automatically and reinject the most relevant context.
+- **Action:** Ensure both hooks are registered:
+  - **SessionEnd** collects boxes into the event store (`BoxCreated`)
+  - **SessionStart** injects recent high-value boxes + top learnings/meta-learnings
+
+If you use other SessionStart/SessionEnd automations, keep hook ordering intentional:
+
+- **SessionStart**: run context injection early so subsequent steps see the injected learnings
+- **SessionEnd**: run box collection reliably so analysis has complete evidence
+
+### 5. Make skills “box-aware”
+
+If you build additional Claude Code skills (beyond `/analyze-boxes`), design them
+to consume and produce the same signals:
+
+- **Inputs (read-only)**
+  - Read injected context (patterns + notable boxes)
+  - Read `~/.claude/analytics/boxes.jsonl` if the skill needs cross-session history
+
+- **Outputs (append-only)**
+  - Prefer emitting new events (e.g. `LearningCreated`, `EvidenceLinked`, `LearningLinked`) over
+    rewriting prior ones
+  - Keep the user-in-the-loop for writes: propose, then ask for approval
+
+### 6. Protect parser compatibility (avoid format drift)
+
+- **Goal:** Keep collection reliable; small format changes can silently reduce recall.
+- **Action:** Preserve the standard box header and delimiter format (emoji + type + 45 dashes).
+- **Action:** If you add new box types or fields, update the parsing/analysis components in lockstep
+  (SessionEnd parser and `/analyze-boxes` expectations).
+
+### 7. Operational workflow that compounds learning
+
+- **During a session**
+  - Use boxes at the point of relevance (assumptions, choices, concerns)
+  - When a prior correction or preference applies, start with `🔄 Reflection`
+
+- **Between sessions**
+  - When SessionStart injects the “unanalyzed boxes” reminder, run `/analyze-boxes`
+  - Treat injected patterns as constraints to follow, not suggestions to ignore
 
 ---
 
