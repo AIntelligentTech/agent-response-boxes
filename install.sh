@@ -12,13 +12,14 @@
 #   curl -sSL https://raw.githubusercontent.com/AIntelligentTech/claude-response-boxes/main/install.sh | bash -s -- --project
 #
 # OPTIONS:
-#   --user           Install to ~/.claude/ (DEFAULT)
-#   --project        Install to ./.claude/ (current project only)
-#   --uninstall      Remove installed components
-#   --dry-run, -n    Print actions without modifying files
-#   --force, -f      Overwrite modified files managed by this installer
-#   --cleanup-legacy Remove legacy v3 artifacts (script/index) if present
-#   --help, -h       Show this help
+#   --user               Install to ~/.claude/ (DEFAULT)
+#   --project            Install to ./.claude/ (current project only)
+#   --uninstall          Remove installed components
+#   --dry-run, -n        Print actions without modifying files
+#   --force, -f          Overwrite modified files managed by this installer
+#   --cleanup-legacy     Remove legacy v3 artifacts (script/index) if present
+#   --install-opencode   Also install OpenCode plugin (response-boxes) to ~/.config/opencode/plugin
+#   --help, -h           Show this help
 #
 
 set -euo pipefail
@@ -33,12 +34,18 @@ VERSION="4.0.0"
 USER_CLAUDE_DIR="${HOME}/.claude"
 PROJECT_CLAUDE_DIR="./.claude"
 
+USER_OPENCODE_PLUGIN_DIR="${HOME}/.config/opencode/plugin"
+
 INSTALL_SCOPE="user"
 CLAUDE_DIR="${USER_CLAUDE_DIR}"
 UNINSTALL=false
 DRY_RUN=false
 FORCE=false
 CLEANUP_LEGACY=false
+INSTALL_OPENCODE_PLUGIN=false
+INSTALL_MODE="full"
+INSTALL_WINDSURF_BASIC=false
+INSTALL_CURSOR_BASIC=false
 
 # Colors
 RED='\033[0;31m'
@@ -107,6 +114,10 @@ parse_args() {
             --dry-run|-n) DRY_RUN=true; shift ;;
             --force|-f)   FORCE=true; shift ;;
             --cleanup-legacy) CLEANUP_LEGACY=true; shift ;;
+            --basic)     INSTALL_MODE="basic"; shift ;;
+            --install-opencode) INSTALL_OPENCODE_PLUGIN=true; shift ;;
+            --install-windsurf-basic) INSTALL_WINDSURF_BASIC=true; shift ;;
+            --install-cursor-basic) INSTALL_CURSOR_BASIC=true; shift ;;
             --help|-h)   show_help; exit 0 ;;
             *)           warn "Unknown option: $1"; shift ;;
         esac
@@ -122,13 +133,19 @@ USAGE:
   curl -sSL https://raw.githubusercontent.com/AIntelligentTech/claude-response-boxes/main/install.sh | bash -s -- --project
 
 OPTIONS:
-  --user         Install to ~/.claude/ (DEFAULT)
-  --project      Install to ./.claude/ (current project only)
-  --uninstall    Remove installed components
-  --dry-run, -n  Print actions without modifying files
-  --force, -f    Overwrite modified files managed by this installer
-  --cleanup-legacy  Remove legacy v3 artifacts (script/index) if present
-  --help, -h     Show this help
+  --user             Install to ~/.claude/ (DEFAULT)
+  --project          Install to ./.claude/ (current project only)
+  --uninstall        Remove installed components
+  --dry-run, -n      Print actions without modifying files
+  --force, -f        Overwrite modified files managed by this installer
+  --cleanup-legacy   Remove legacy v3 artifacts (script/index) if present
+  --basic            Install prompt-only mode (no hooks/analytics/skills/plugins)
+  --install-opencode Also install the OpenCode response-boxes plugin (user-level)
+  --install-windsurf-basic
+                     Install Response Boxes basic-mode rule for Windsurf
+  --install-cursor-basic
+                     Install Response Boxes basic-mode rule for Cursor (project-level)
+  --help, -h         Show this help
 EOF
 }
 
@@ -157,11 +174,12 @@ detect_source() {
 
 is_local_source_dir() {
     local dir="$1"
-    [[ -f "${dir}/output-styles/response-box.md" ]] || return 1
-    [[ -f "${dir}/rules/response-boxes.md" ]] || return 1
-    [[ -f "${dir}/hooks/inject-context.sh" ]] || return 1
-    [[ -f "${dir}/hooks/session-processor.sh" ]] || return 1
-    [[ -f "${dir}/skills/analyze-boxes/SKILL.md" ]] || return 1
+    local base="${dir}/agents/claude-code"
+    [[ -f "${base}/output-styles/response-box.md" ]] || return 1
+    [[ -f "${base}/rules/response-boxes.md" ]] || return 1
+    [[ -f "${base}/hooks/inject-context.sh" ]] || return 1
+    [[ -f "${base}/hooks/session-processor.sh" ]] || return 1
+    [[ -f "${base}/skills/analyze-boxes/SKILL.md" ]] || return 1
     return 0
 }
 
@@ -330,21 +348,26 @@ report_status() {
         warn "Legacy v3 index detected: ~/.claude/analytics/box-index.json"
     fi
 
-    local boxes_file="${USER_CLAUDE_DIR}/analytics/boxes.jsonl"
-    if [[ -f "$boxes_file" ]] && [[ -s "$boxes_file" ]]; then
-        if head -c 1 "$boxes_file" 2>/dev/null | grep -q '^\['; then
-            warn "Analytics store is JSON array (expected JSONL): ~/.claude/analytics/boxes.jsonl"
+    local canonical_boxes_file="${HOME}/.response-boxes/analytics/boxes.jsonl"
+    local legacy_boxes_file="${USER_CLAUDE_DIR}/analytics/boxes.jsonl"
+
+    if [[ -f "$canonical_boxes_file" ]] && [[ -s "$canonical_boxes_file" ]]; then
+        if head -c 1 "$canonical_boxes_file" 2>/dev/null | grep -q '^\['; then
+            warn "Analytics store is JSON array (expected JSONL): ${canonical_boxes_file}"
         elif check_jq; then
-            if jq -s 'length' "$boxes_file" &>/dev/null; then
+            if jq -s 'length' "$canonical_boxes_file" &>/dev/null; then
                 local max_schema
-                max_schema=$(jq -s -r '[.[] | (.schema_version // 0)] | max // 0' "$boxes_file" 2>/dev/null || echo "0")
+                max_schema=$(jq -s -r '[.[] | (.schema_version // 0)] | max // 0' "$canonical_boxes_file" 2>/dev/null || echo "0")
                 if [[ -n "$max_schema" ]] && [[ "$max_schema" != "null" ]] && [[ "$max_schema" -gt 1 ]]; then
                     warn "Analytics schema version ${max_schema} is newer than this installer/hook set supports"
                 fi
             else
-                warn "Analytics store is not valid JSON lines: ~/.claude/analytics/boxes.jsonl"
+                warn "Analytics store is not valid JSON lines: ${canonical_boxes_file}"
             fi
         fi
+    elif [[ -f "$legacy_boxes_file" ]] && [[ -s "$legacy_boxes_file" ]]; then
+        warn "Legacy analytics store detected: ${legacy_boxes_file}"
+        info "On next hook run, it will be copied to: ${canonical_boxes_file}"
     fi
 
     if [[ -f "${USER_CLAUDE_DIR}/settings.json" ]] && check_jq; then
@@ -468,30 +491,30 @@ check_curl() {
 
 install_output_style() {
     log "Installing output style..."
-    install_managed_file "output-styles/response-box.md" "${USER_CLAUDE_DIR}/output-styles/response-box.md"
+    install_managed_file "agents/claude-code/output-styles/response-box.md" "${USER_CLAUDE_DIR}/output-styles/response-box.md"
 }
 
 install_rules() {
     log "Installing rules..."
-    install_managed_file "rules/response-boxes.md" "${CLAUDE_DIR}/rules/response-boxes.md"
+    install_managed_file "agents/claude-code/rules/response-boxes.md" "${CLAUDE_DIR}/rules/response-boxes.md"
 }
 
 install_hooks() {
     log "Installing hooks..."
-    install_managed_file "hooks/inject-context.sh" "${USER_CLAUDE_DIR}/hooks/inject-context.sh" "+x"
+    install_managed_file "agents/claude-code/hooks/inject-context.sh" "${USER_CLAUDE_DIR}/hooks/inject-context.sh" "+x"
 
-    install_managed_file "hooks/session-processor.sh" "${USER_CLAUDE_DIR}/hooks/session-processor.sh" "+x"
+    install_managed_file "agents/claude-code/hooks/session-processor.sh" "${USER_CLAUDE_DIR}/hooks/session-processor.sh" "+x"
 }
 
 install_skills() {
     log "Installing skills..."
-    install_managed_file "skills/analyze-boxes/SKILL.md" "${USER_CLAUDE_DIR}/skills/analyze-boxes/SKILL.md"
+    install_managed_file "agents/claude-code/skills/analyze-boxes/SKILL.md" "${USER_CLAUDE_DIR}/skills/analyze-boxes/SKILL.md"
 }
 
 create_analytics_dir() {
     log "Creating analytics directory..."
-    run_cmd mkdir -p "${USER_CLAUDE_DIR}/analytics"
-    log "  → ~/.claude/analytics/"
+    run_cmd mkdir -p "${HOME}/.response-boxes/analytics"
+    log "  → ~/.response-boxes/analytics/"
 }
 
 register_hooks() {
@@ -596,7 +619,7 @@ install_claude_md_snippet() {
     fi
 
     local snippet_tmp
-    snippet_tmp="$(fetch_to_temp "config/claude-md-snippet.md")"
+    snippet_tmp="$(fetch_to_temp "agents/claude-code/config/claude-md-snippet.md")"
 
     if snippet_exists "$claude_md"; then
         log "Updating Response Box snippet in CLAUDE.md..."
@@ -632,6 +655,103 @@ install_claude_md_snippet() {
     rm -f "$snippet_tmp"
 }
 
+install_opencode_plugin() {
+    if [[ "$INSTALL_SCOPE" != "user" ]]; then
+        info "OpenCode plugin is user-level only; skipping for project scope"
+        return 0
+    fi
+
+    if [[ "$INSTALL_OPENCODE_PLUGIN" != "true" ]]; then
+        return 0
+    fi
+
+    log "Installing OpenCode plugin..."
+    install_managed_file "agents/opencode/plugins/response-boxes.plugin.ts" "${USER_OPENCODE_PLUGIN_DIR}/response-boxes.plugin.ts"
+}
+
+install_windsurf_basic() {
+    if [[ "$INSTALL_SCOPE" == "user" ]]; then
+        # Support both the documented Codeium/Windsurf location and a Codium-based
+        # Windsurf Next config root under ~/.codium/.windsurf-next/.
+        local global_targets=(
+            "${HOME}/.codeium/windsurf/memories/global_rules.md"
+            "${HOME}/.codium/.windsurf-next/memories/global_rules.md"
+        )
+
+        if [[ "$DRY_RUN" == "true" ]]; then
+            for global_rules in "${global_targets[@]}"; do
+                if [[ -f "$global_rules" ]]; then
+                    info "Would append Response Boxes (basic mode) rule to Windsurf global rules: $global_rules"
+                else
+                    info "Would create Windsurf global rules file with Response Boxes (basic mode) rule: $global_rules"
+                fi
+            done
+            return 0
+        fi
+
+        local tmp_template
+        tmp_template="$(fetch_to_temp "agents/windsurf/rules/response-boxes.md")"
+
+        for global_rules in "${global_targets[@]}"; do
+            run_cmd mkdir -p "$(dirname "$global_rules")"
+
+            if [[ -f "$global_rules" ]] && grep -q "Response Boxes (Basic Mode" "$global_rules" 2>/dev/null; then
+                info "Windsurf Response Boxes basic-mode rule already present in: $global_rules; skipping"
+                continue
+            fi
+
+            backup_if_exists "$global_rules"
+
+            {
+                if [[ -f "$global_rules" ]]; then
+                    cat "$global_rules"
+                    echo ""
+                    echo ""
+                fi
+
+                # Append the body of the template (strip YAML frontmatter if present).
+                awk '
+                    BEGIN { in_front = 0 }
+                    NR == 1 && $0 ~ /^---[[:space:]]*$/ { in_front = 1; next }
+                    in_front == 1 {
+                        if ($0 ~ /^---[[:space:]]*$/) { in_front = 0; next }
+                        next
+                    }
+                    { print }
+                ' "$tmp_template"
+            } > "${global_rules}.tmp"
+
+            mv "${global_rules}.tmp" "$global_rules"
+            log "  → Installed Windsurf basic-mode rule into ${global_rules}"
+        done
+
+        rm -f "$tmp_template"
+    else
+        # Project-level: install a dedicated rule file under .windsurf/rules/
+        local dst=".windsurf/rules/response-boxes.md"
+        log "Installing Windsurf basic-mode rule into project: ${dst}"
+        install_managed_file "agents/windsurf/rules/response-boxes.md" "$dst"
+    fi
+}
+
+install_cursor_basic() {
+    local dst=".cursor/rules/response-boxes.mdc"
+
+    if [[ "$INSTALL_SCOPE" == "user" ]]; then
+        if [[ "$DRY_RUN" == "true" ]]; then
+            info "Cursor basic-mode rules are project-level only; run installer with --project --install-cursor-basic in each repository where you want them."
+            return 0
+        fi
+
+        warn "Cursor basic-mode rules are project-level only; no user-level rules file will be installed automatically."
+        info "Re-run this installer with --project --install-cursor-basic in repositories where you want Cursor Response Boxes rules."
+        return 0
+    fi
+
+    log "Installing Cursor basic-mode rule into project: ${dst}"
+    install_managed_file "agents/cursor/rules/response-boxes.mdc" "$dst"
+}
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Uninstall
 # ─────────────────────────────────────────────────────────────────────────────
@@ -652,6 +772,7 @@ uninstall() {
             "${USER_CLAUDE_DIR}/hooks/session-processor.sh"
             "${USER_CLAUDE_DIR}/skills/analyze-boxes/skill.md"
             "${USER_CLAUDE_DIR}/skills/analyze-boxes/SKILL.md"
+            "${USER_OPENCODE_PLUGIN_DIR}/response-boxes.plugin.ts"
         )
     fi
 
@@ -708,7 +829,7 @@ uninstall() {
     info "Manually remove the Response Box System section from CLAUDE.md"
 
     warn "Note: Analytics data NOT removed"
-    info "To remove collected boxes: rm -rf ~/.claude/analytics/"
+    info "To remove collected boxes: rm -rf ~/.response-boxes/analytics/"
 
     echo ""
     log "Uninstall complete"
@@ -736,6 +857,7 @@ main() {
     info "Source: ${SOURCE}"
     info "Scope: ${INSTALL_SCOPE}"
     info "Target: ${CLAUDE_DIR}"
+    info "Mode:   ${INSTALL_MODE}"
     if [[ "$DRY_RUN" == "true" ]]; then
         warn "Dry-run mode enabled (no files will be modified)"
     fi
@@ -757,6 +879,19 @@ main() {
     install_rules
     install_claude_md_snippet
 
+    # Optional basic-mode installations for other agents (prompt-only)
+    if [[ "$INSTALL_WINDSURF_BASIC" == "true" ]]; then
+        echo ""
+        info "Installing Windsurf basic-mode integration..."
+        install_windsurf_basic
+    fi
+
+    if [[ "$INSTALL_CURSOR_BASIC" == "true" ]]; then
+        echo ""
+        info "Installing Cursor basic-mode integration..."
+        install_cursor_basic
+    fi
+
     if [[ "$CLEANUP_LEGACY" == "true" ]]; then
         echo ""
         info "Cleaning up legacy v3 artifacts..."
@@ -765,17 +900,25 @@ main() {
 
     # Hook and analytics installation (user-level only)
     if [[ "$INSTALL_SCOPE" == "user" ]]; then
-        echo ""
-        info "Installing cross-session learning components..."
-        install_hooks
-        install_skills
-        create_analytics_dir
-
-        if check_jq; then
-            register_hooks
+        if [[ "$INSTALL_MODE" == "basic" ]]; then
+            echo ""
+            info "Basic mode selected: skipping hooks, skills, analytics directory, and OpenCode plugin (prompt-only installation)."
         else
-            warn "Skipping hook registration (jq not available)"
-            info "Manually add hooks to ~/.claude/settings.json"
+            echo ""
+            info "Installing cross-session learning components (full mode)..."
+            install_hooks
+            install_skills
+            create_analytics_dir
+
+            if check_jq; then
+                register_hooks
+            else
+                warn "Skipping hook registration (jq not available)"
+                info "Manually add hooks to ~/.claude/settings.json"
+            fi
+
+            # Optional: install OpenCode plugin when requested.
+            install_opencode_plugin
         fi
     else
         info "Note: Hooks and analytics are user-level only"
@@ -794,7 +937,7 @@ main() {
     if [[ "$INSTALL_SCOPE" == "user" ]]; then
         echo "  • Hooks:        ~/.claude/hooks/"
         echo "  • Skills:       ~/.claude/skills/analyze-boxes/"
-        echo "  • Analytics:    ~/.claude/analytics/"
+        echo "  • Analytics:    ~/.response-boxes/analytics/"
     fi
     echo ""
     echo "Activate:"

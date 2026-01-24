@@ -31,7 +31,7 @@
 #   BOX_RECENCY_DECAY    - Weekly decay factor (default: 0.95)
 #
 # EVENT STORE:
-#   ~/.claude/analytics/boxes.jsonl - Append-only event log
+#   ~/.response-boxes/analytics/boxes.jsonl - Append-only event log
 #
 
 set -euo pipefail
@@ -40,8 +40,13 @@ set -euo pipefail
 # Configuration
 # ─────────────────────────────────────────────────────────────────────────────
 
-ANALYTICS_DIR="${HOME}/.claude/analytics"
-BOXES_FILE="${ANALYTICS_DIR}/boxes.jsonl"
+DEFAULT_BASE_DIR="${HOME}/.response-boxes"
+DEFAULT_ANALYTICS_DIR="${DEFAULT_BASE_DIR}/analytics"
+DEFAULT_BOXES_FILE="${DEFAULT_ANALYTICS_DIR}/boxes.jsonl"
+LEGACY_BOXES_FILE="${HOME}/.claude/analytics/boxes.jsonl"
+
+ANALYTICS_DIR="${RESPONSE_BOXES_ANALYTICS_DIR:-${DEFAULT_ANALYTICS_DIR}}"
+BOXES_FILE="${RESPONSE_BOXES_FILE:-${DEFAULT_BOXES_FILE}}"
 
 SUPPORTED_SCHEMA_VERSION=1
 
@@ -55,6 +60,19 @@ RECENCY_DECAY="${BOX_RECENCY_DECAY:-0.95}"
 
 log() {
     echo "[inject-context] $*" >&2
+}
+
+legacy_store_is_valid_jsonl() {
+    local file="$1"
+    if [[ ! -f "$file" ]] || [[ ! -s "$file" ]]; then
+        return 1
+    fi
+
+    if head -c 1 "$file" 2>/dev/null | grep -q '^\['; then
+        return 1
+    fi
+
+    jq -s 'length' "$file" &>/dev/null
 }
 
 output_context() {
@@ -240,17 +258,8 @@ format_learnings() {
     local count="$2"
 
     echo "$learnings" | jq -r --argjson n "$count" '
-        .[0:$n] | map(
-            (if .effective_confidence >= 0.8 then "[HIGH]"
-             elif .effective_confidence >= 0.6 then "[MEDIUM]"
-             else "[LOW]" end) as $level |
-            (if .scope == "repo" then " (repo-specific)" else "" end) as $scope |
-            (if (.level // 0) > 0 then " [meta-learning]" else "" end) as $meta |
-
-            "• " + $level + " " + .insight + $scope + $meta +
-            " (" + ((.effective_confidence * 100) | floor | tostring) + "% confidence, " +
-            (.evidence_count | tostring) + " evidence)"
-        ) | join("\n")
+        .[0:$n] | map("• [" + ((.effective_confidence // 0.0) | tostring) + "] " + (.insight // "") +
+            if (.scope // "") == "repo" then " (repo-specific)" else "" end) | .[]
     '
 }
 
@@ -259,31 +268,23 @@ format_boxes() {
     local count="$2"
 
     echo "$boxes" | jq -r --argjson n "$count" '
-        .[0:$n] | map(
-            (if .age_weeks < 1 then "today"
-             elif .age_weeks < 2 then "1 week ago"
-             else ((.age_weeks | floor | tostring) + " weeks ago")
-             end) as $age |
-
-            "• " + .box_type + ": " +
-            (if .box_type == "Assumption" then
-                "Assumed \"" + (.fields.what // "N/A") + "\""
-            elif .box_type == "Choice" then
-                "Chose " + (.fields.selected // "N/A") + " over " + (.fields.alternatives // "N/A")
-            elif .box_type == "Warning" then
-                (.fields.risk // "N/A")
-            elif .box_type == "Pushback" then
-                "Pushed back on: " + (.fields.position // "N/A")
-            elif .box_type == "Reflection" then
-                "Applied: " + (.fields.learning // .fields.application // "N/A")
-            elif .box_type == "Completion" and .fields.gaps then
-                "Gap noted: " + (.fields.gaps // "N/A")
-            else
-                (.fields | to_entries | .[0:2] | map("\(.key): \(.value)") | join(", "))
-            end) +
-            " [" + (.context.git_remote // "local") + "] (" + $age + ")"
-        ) | join("\n")
+        .[0:$n] | map("• " + (.box_type // "Unknown") + ": " + ((.fields.summary // .fields.title // .fields.what // .fields.issue // .fields.idea // .fields.request // "(no summary)") | tostring) +
+            (if (.context.git_remote // "") != "" then " [" + (.context.git_remote | tostring) + "]" else "" end) +
+            (if (.age_weeks // 0) > 0 then " (" + ((.age_weeks | tonumber) | floor | tostring) + " weeks ago)" else "" end)) | .[]
     '
+}
+
+build_context_block() {
+    local learnings="$1"
+    local boxes="$2"
+
+    {
+        echo "## Patterns (from cross-session analysis)"
+        echo "$learnings"
+        echo ""
+        echo "## Recent Notable Boxes"
+        echo "$boxes"
+    } | sed '/^$/N;/^\n$/D'
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -291,8 +292,13 @@ format_boxes() {
 # ─────────────────────────────────────────────────────────────────────────────
 
 main() {
-    # Check if disabled
-    if [[ "${BOX_INJECT_DISABLED:-false}" == "true" ]]; then
+    # Read hook input
+    local input
+    input="$(cat 2>/dev/null || echo '{}')"
+
+    # Check for disable flag
+    if [[ "${BOX_INJECT_DISABLED:-false}" == "true" ]] || [[ "${RESPONSE_BOXES_DISABLED:-false}" == "true" ]]; then
+        log "Injection disabled via environment variable"
         output_empty
         exit 0
     fi
@@ -304,135 +310,57 @@ main() {
         exit 0
     fi
 
-    # Check if event store exists
-    if [[ ! -f "$BOXES_FILE" ]]; then
+    # Ensure analytics directory exists (for potential legacy migration)
+    mkdir -p "$ANALYTICS_DIR"
+
+    # One-way compatibility migration: if legacy exists and canonical doesn't,
+    # and legacy looks like valid JSONL, then copy it.
+    if [[ ! -f "$BOXES_FILE" ]] && legacy_store_is_valid_jsonl "$LEGACY_BOXES_FILE"; then
+        log "Migrating legacy analytics store to canonical location"
+        cp "$LEGACY_BOXES_FILE" "$BOXES_FILE"
+    fi
+
+    if [[ ! -f "$BOXES_FILE" ]] || [[ ! -s "$BOXES_FILE" ]]; then
+        log "No analytics store found at $BOXES_FILE (or file is empty)"
         output_empty
         exit 0
     fi
 
-    if ! jq -s 'length' "$BOXES_FILE" &>/dev/null; then
-        output_context "PRIOR SESSION LEARNINGS:\n\nAnalytics event store is not valid JSON lines. Back up ~/.claude/analytics/boxes.jsonl and repair or reset to restore cross-session injection."
-        exit 0
-    fi
-
-    local max_schema_version
-    max_schema_version=$(jq -s -r '[.[] | (.schema_version // 0)] | max // 0' "$BOXES_FILE" 2>/dev/null || echo "0")
-    if [[ -z "$max_schema_version" ]] || [[ "$max_schema_version" == "null" ]]; then
-        max_schema_version=0
-    fi
-    if [[ "$max_schema_version" -gt "$SUPPORTED_SCHEMA_VERSION" ]]; then
-        output_context "PRIOR SESSION LEARNINGS:\n\nAnalytics schema version ${max_schema_version} is newer than this hook supports. Update Claude Response Boxes to restore cross-session injection."
-        exit 0
-    fi
-
-    # Read input from stdin
-    local input
-    input=$(cat)
-
-    # Extract current working directory
     local cwd
-    cwd=$(echo "$input" | jq -r '.cwd // empty')
+    cwd="$(echo "$input" | jq -r '.cwd // ""' 2>/dev/null || echo "")"
 
-    # Get current repository
-    local current_repo=""
-    if [[ -n "$cwd" ]] && [[ -d "$cwd" ]]; then
-        current_repo=$(cd "$cwd" && git remote get-url origin 2>/dev/null | sed -E 's|^(https?://\|git@)||; s|:|/|; s|\.git$||' || echo "")
+    local git_remote=""
+    if [[ -n "$cwd" ]] && command -v git &>/dev/null; then
+        if git -C "$cwd" rev-parse --is-inside-work-tree &>/dev/null; then
+            git_remote="$(git -C "$cwd" config --get remote.origin.url 2>/dev/null || echo "")"
+        fi
     fi
 
-    # Get current epoch time
     local now_epoch
-    now_epoch=$(date +%s)
+    now_epoch="$(date +%s)"
 
-    # Check for unanalyzed boxes since last analysis
-    local last_analysis_epoch
-    last_analysis_epoch=$(jq -s -r '
-        def ts_epoch($v):
-            ($v // "1970-01-01T00:00:00Z") | sub("\\.[0-9]+"; "") | fromdateiso8601;
-        ([.[] | select(.event == "AnalysisCompleted")] | sort_by(.ts)) as $runs |
-        if ($runs | length) > 0 then
-            ts_epoch($runs[-1].through_ts // $runs[-1].ts)
-        else
-            ts_epoch("1970-01-01T00:00:00Z")
-        end
-    ' "$BOXES_FILE" 2>/dev/null || echo "0")
-    if [[ -z "$last_analysis_epoch" ]] || [[ "$last_analysis_epoch" == "null" ]]; then
-        last_analysis_epoch=0
-    fi
-
-    local unanalyzed_count
-    unanalyzed_count=$(jq -s --argjson since "$last_analysis_epoch" '
-        def ts_epoch($v):
-            ($v // "1970-01-01T00:00:00Z") | sub("\\.[0-9]+"; "") | fromdateiso8601;
-        [.[] | select(((.event // "BoxCreated") == "BoxCreated") and (ts_epoch(.ts) > $since))] | length
-    ' "$BOXES_FILE" 2>/dev/null || echo "0")
-    if [[ "$unanalyzed_count" == "null" ]] || [[ -z "$unanalyzed_count" ]]; then
-        unanalyzed_count=0
-    fi
-
-    # Project learnings
     local learnings
-    learnings=$(project_learnings "$current_repo" "$now_epoch" "$RECENCY_DECAY")
+    learnings="$(project_learnings "$git_remote" "$now_epoch" "$RECENCY_DECAY")"
 
-    local learning_count
-    learning_count=$(echo "$learnings" | jq 'length')
-
-    # Project boxes
     local boxes
-    boxes=$(project_boxes "$current_repo" "$now_epoch" "$RECENCY_DECAY" 60)
+    boxes="$(project_boxes "$git_remote" "$now_epoch" "$RECENCY_DECAY" 60)"
 
-    local box_count
-    box_count=$(echo "$boxes" | jq 'length')
-
-    # Build context if we have data
-    if [[ "$learning_count" -eq 0 ]] && [[ "$box_count" -eq 0 ]] && [[ "$unanalyzed_count" -eq 0 ]]; then
+    if [[ -z "$learnings" || "$learnings" == "[]" ]] && [[ -z "$boxes" || "$boxes" == "[]" ]]; then
+        log "No relevant learnings or boxes to inject"
         output_empty
         exit 0
     fi
 
-    local context_parts=()
+    local learnings_text
+    learnings_text="$(format_learnings "$learnings" "$INJECT_LEARNINGS")"
 
-    if [[ "$unanalyzed_count" -gt 0 ]]; then
-        context_parts+=("Unanalyzed response boxes detected (${unanalyzed_count}). Run /analyze-boxes to update learnings.")
-        context_parts+=("")
-    fi
+    local boxes_text
+    boxes_text="$(format_boxes "$boxes" "$INJECT_BOXES")"
 
-    # Add learnings section if available
-    if [[ "$learning_count" -gt 0 ]]; then
-        local formatted_learnings
-        formatted_learnings=$(format_learnings "$learnings" "$INJECT_LEARNINGS")
-        if [[ -n "$formatted_learnings" ]] && [[ "$formatted_learnings" != "null" ]]; then
-            context_parts+=("## Patterns (from cross-session analysis)")
-            context_parts+=("$formatted_learnings")
-            context_parts+=("")
-        fi
-    fi
+    local context_block
+    context_block="$(build_context_block "$learnings_text" "$boxes_text")"
 
-    # Add boxes section if available
-    if [[ "$box_count" -gt 0 ]]; then
-        local formatted_boxes
-        formatted_boxes=$(format_boxes "$boxes" "$INJECT_BOXES")
-        if [[ -n "$formatted_boxes" ]] && [[ "$formatted_boxes" != "null" ]]; then
-            context_parts+=("## Recent Notable Boxes")
-            context_parts+=("$formatted_boxes")
-            context_parts+=("")
-        fi
-    fi
-
-    # Assemble final context
-    if [[ ${#context_parts[@]} -gt 0 ]]; then
-        local context_text
-        context_text="PRIOR SESSION LEARNINGS:
-
-$(printf '%s\n' "${context_parts[@]}")
-Review and apply using 🔄 Reflection where relevant."
-
-        output_context "$context_text"
-        log "Injected $learning_count learnings and $box_count boxes (unanalyzed: $unanalyzed_count)"
-    else
-        output_empty
-    fi
-
-    exit 0
+    output_context "$context_block"
 }
 
 main "$@"

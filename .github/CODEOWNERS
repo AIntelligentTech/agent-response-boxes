@@ -1,0 +1,27 @@
+# Response Boxes Code Owners
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything
+* @AIntelligentTech
+
+# Agent-specific integrations
+/agents/claude-code/ @AIntelligentTech
+/agents/opencode/ @AIntelligentTech
+/agents/cursor/ @AIntelligentTech
+/agents/windsurf/ @AIntelligentTech
+
+# Core hooks (critical path)
+/agents/*/hooks/ @AIntelligentTech
+
+# Installation script
+/install.sh @AIntelligentTech
+
+# Documentation
+/docs/ @AIntelligentTech
+/README.md @AIntelligentTech
+
+# CI/CD
+/.github/workflows/ @AIntelligentTech
+
+# Tests
+/tests/ @AIntelligentTech

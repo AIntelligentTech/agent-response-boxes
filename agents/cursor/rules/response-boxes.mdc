@@ -1,0 +1,122 @@
+# Response Boxes (Basic Mode for Cursor)
+
+This Cursor Rules file teaches the Cursor Agent to use the **Response Boxes**
+workflow as an always-on behavior for this project, **without** any
+cross-session learning, event store, or automatic `/analyze-boxes` behavior.
+
+Cursor will read this file early in its context load, so treat it as a
+persistent, high-priority guideline.
+
+## Scope and non-goals
+
+- **In scope**
+  - Within-session metacognition: better structure, explicit decisions, visible
+    risks, and clear follow-ups.
+  - Consistent use of Response Boxes formats for substantial work.
+- **Out of scope (basic mode)**
+  - Writing to any external analytics or event-store files (e.g. `boxes.jsonl`).
+  - Running or emulating `/analyze-boxes`.
+  - Referring to cross-session learning loops unless the user explicitly asks.
+
+If the user later enables a full Response Boxes adapter (hooks, event store,
+skills), this rule remains the **within-session** behavior.
+
+## Core behavior
+
+When acting as an AI coding assistant in this project:
+
+- **Think and explain via Response Boxes.**
+- Prefer **structured reasoning** over long, unstructured paragraphs.
+- Make decisions and trade-offs **visible and inspectable**.
+
+For any non-trivial task (design, multi-step coding, refactors, reviews), use
+this pattern:
+
+1. **Turn Start: Self-Reflection**
+   - 1–3 short bullets on what you understand, your plan, and any key risks.
+2. **Pre-Response Checklist**
+   - 3–7 bullets of concrete checks you will perform before finalizing your
+     answer (edge cases, tests, performance, UX, docs, etc.).
+3. **Response Boxes**
+   - One or more explicit boxes (sections) using the types below.
+4. **Main answer / code**
+   - The detailed explanation and code edits, outside of the boxes.
+
+For very small or mechanical actions (renames, obvious one-liners), you may use
+one terse box or omit the full structure if it would add noise. When unsure,
+**include at least one box**.
+
+## Box types (basic mode)
+
+Use these as named sections in your responses. The exact visual formatting can
+adapt to Cursor, but the semantics should remain consistent.
+
+- **Choice**
+  - When selecting between multiple plausible options.
+  - List options, pros/cons, and a clear recommendation.
+- **Decision**
+  - When committing to a design, API, or plan.
+  - State what you decided, why, and key trade-offs.
+- **Assumption**
+  - When filling in missing details.
+  - List assumptions and note how to validate them.
+- **Concern**
+  - When you detect risks, smells, or potential failures.
+  - Explain impact, likelihood, and mitigation.
+- **Warning**
+  - When something is dangerous, brittle, or urgently needs attention.
+  - Be direct and prescribe next steps.
+- **Suggestion**
+  - When proposing improvements beyond the immediate request.
+  - Keep these concrete and scoped.
+- **Quality**
+  - When reviewing or critiquing code.
+  - Highlight strengths, weaknesses, and concrete improvements.
+- **FollowUps**
+  - When there are clear next steps.
+  - Express them as a short, prioritized checklist.
+- **Completion**
+  - When summarizing what you actually did.
+  - Mention files touched, main changes, and quick verification.
+- **Reflection**
+  - When stepping back to evaluate your own work.
+  - Note what went well, what you’d change, and any patterns noticed.
+
+Use **Sycophancy** sparingly and only when you are explicitly diagnosing or
+correcting flattery vs honesty. Do not use boxes to flatter the user; use them
+to **improve reasoning quality**.
+
+## When to use boxes
+
+You **should** use one or more boxes for:
+
+- Multi-file edits or larger refactors
+- API or architecture design
+- Debugging flows with multiple hypotheses
+- Code reviews and quality assessments
+
+You **may** skip boxes for:
+
+- Tiny documentation or comment tweaks
+- Obvious, single-line completions
+- Purely mechanical renames with no design impact
+
+When the user asks for “just the code” or very low verbosity, keep boxes short
+but do not silently drop them for complex tasks.
+
+## Respect project-specific rules
+
+- Obey any additional Cursor rules in `.cursor/rules` and any instructions the
+  project defines (e.g. architecture or security guidelines).
+- If there is a conflict, follow project safety/style rules first while still
+  using boxes when possible.
+
+## (Optional) Referencing the full spec
+
+If this project also includes the full Response Boxes spec as a markdown file
+(e.g. `rules/response-boxes.md`), you can treat that file as the canonical
+reference for detailed box semantics and examples.
+
+When helpful, you may conceptually "consult" that spec to ensure your behavior
+stays aligned, but you **must not** assume any automatic cross-session storage
+or analytics. All learning remains **within this Cursor session** in basic mode.

@@ -1,0 +1,122 @@
+# Changelog
+
+All notable changes to Claude Response Boxes will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+
+- GitHub Actions CI/CD pipeline
+- Bash testing framework (bats)
+- TypeScript tests for OpenCode plugin
+- Windsurf full-mode support with collection hook and injection workflow
+- Cursor enhanced basic mode with collection hook and manual context skill
+- Comprehensive cross-agent compatibility documentation
+- SECURITY.md with vulnerability reporting guidelines
+- GitHub issue and PR templates
+
+### Changed
+
+- Consolidated repository structure (removed duplicate root-level directories)
+- Improved OpenCode plugin with session correlation
+
+### Fixed
+
+- CODE_OF_CONDUCT.md contact information
+
+## [4.0.0] - 2026-01-22
+
+### Added
+
+- Event-sourced architecture with `boxes.jsonl`
+- AI-powered `/analyze-boxes` skill for pattern recognition
+- Cross-session learning with recency decay
+- Support for learning hierarchy (meta-learnings)
+- OpenCode plugin for shared event store
+- `BOX_RECENCY_DECAY` environment variable for configuring decay factor
+
+### Changed
+
+- Boxes stored as JSONL events instead of JSON array
+- Learnings now synthesized from evidence with confidence tracking
+- SessionStart hook projects learnings instead of raw boxes
+
+### Removed
+
+- Static `box-index.json` in favor of dynamic projection
+
+## [3.0.0] - 2026-01-21
+
+### Added
+
+- Prompt-only architecture for agent-agnostic design
+- Basic mode installation (`--basic` flag)
+- Windsurf basic-mode rule support
+- Cursor basic-mode rule support
+
+### Changed
+
+- Simplified installation to focus on rules and output styles
+- Moved agent-specific files to `agents/` directory
+
+### Removed
+
+- Hard dependency on Claude Code hooks for basic mode
+
+## [2.1.0] - 2026-01-20
+
+### Added
+
+- User/project installation scopes
+- `--project` flag for project-level installation
+- `--uninstall` flag for removing components
+- Backup mechanism for modified files
+
+### Changed
+
+- Default installation scope is now user-level (`~/.claude/`)
+- Installer detects and reports existing installation status
+
+## [2.0.0] - 2026-01-19
+
+### Added
+
+- SessionStart hook for context injection (`inject-context.sh`)
+- SessionEnd hook for box collection (`session-processor.sh`)
+- Analytics directory (`~/.claude/analytics/`)
+- `box-index.json` for tracking collected boxes
+- `BOX_INJECT_LEARNINGS` and `BOX_INJECT_BOXES` environment variables
+
+### Changed
+
+- Hooks registered in `~/.claude/settings.json`
+- Cross-session learning now automated via hooks
+
+## [1.0.0] - 2026-01-15
+
+### Added
+
+- Initial release of Response Box System
+- 13 box types (Choice, Decision, Assumption, Concern, Warning, Confidence,
+  Pushback, Suggestion, Reflection, FollowUps, Completion, Quality, Sycophancy)
+- Output style (`response-box.md`)
+- Rules specification (`response-boxes.md`)
+- CLAUDE.md snippet for integration
+- Installation script with dry-run support
+
+[Unreleased]:
+  https://github.com/AIntelligentTech/claude-response-boxes/compare/v4.0.0...HEAD
+[4.0.0]:
+  https://github.com/AIntelligentTech/claude-response-boxes/compare/v3.0.0...v4.0.0
+[3.0.0]:
+  https://github.com/AIntelligentTech/claude-response-boxes/compare/v2.1.0...v3.0.0
+[2.1.0]:
+  https://github.com/AIntelligentTech/claude-response-boxes/compare/v2.0.0...v2.1.0
+[2.0.0]:
+  https://github.com/AIntelligentTech/claude-response-boxes/compare/v1.0.0...v2.0.0
+[1.0.0]:
+  https://github.com/AIntelligentTech/claude-response-boxes/releases/tag/v1.0.0

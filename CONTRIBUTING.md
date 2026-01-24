@@ -64,7 +64,7 @@ git clone https://github.com/AIntelligentTech/claude-response-boxes.git
 cd claude-response-boxes
 
 # Make scripts executable
-chmod +x install.sh hooks/*.sh
+chmod +x install.sh agents/claude-code/hooks/*.sh
 ```
 
 ## Questions?

@@ -81,16 +81,16 @@ The system operates in three layers:
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  LAYER 1: PROMPT GUIDANCE                                                    │
-│  ├── output-styles/response-box.md    Active during sessions                │
-│  ├── rules/response-boxes.md          Complete specification                │
-│  └── config/claude-md-snippet.md      Minimal CLAUDE.md integration         │
+│  ├── agents/claude-code/output-styles/response-box.md    Active during sessions      │
+│  ├── agents/claude-code/rules/response-boxes.md          Complete specification      │
+│  └── agents/claude-code/config/claude-md-snippet.md      Minimal CLAUDE.md integration │
 │                                                                              │
 │  LAYER 2: DATA PERSISTENCE (Hooks)                                           │
 │  ├── SessionStart: inject-context.sh   Load prior learnings                 │
 │  └── SessionEnd: session-processor.sh  Collect and emit box events          │
 │                                                                              │
 │  LAYER 3: ANALYTICS                                                          │
-│  └── skills/analyze-boxes/SKILL.md     AI-powered analysis skill            │
+│  └── agents/claude-code/skills/analyze-boxes/SKILL.md     AI-powered analysis skill  │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -211,7 +211,7 @@ Or set as default in `~/.claude/settings.json`:
 
 ## What Gets Installed
 
-### User-Level (`~/.claude/`)
+### User-Level (`~/.claude/` + `~/.response-boxes/`)
 
 ```text
 ~/.claude/
@@ -225,6 +225,8 @@ Or set as default in `~/.claude/settings.json`:
 ├── skills/
 │   └── analyze-boxes/
 │       └── SKILL.md              # /analyze-boxes skill
+
+~/.response-boxes/
 └── analytics/
     └── boxes.jsonl               # Event store (created on first use)
 ```
@@ -271,7 +273,7 @@ Or set as default in `~/.claude/settings.json`:
 - **Guardrail**: If the event store contains a newer schema version than the hooks support,
   the hook injects a clear “update required” message instead of producing incorrect context.
 - **Recovery**: If the event store becomes corrupted or is not JSONL, the hooks will inject a
-  diagnostic message. Back up `~/.claude/analytics/boxes.jsonl` and repair/reset it to restore
+  diagnostic message. Back up `~/.response-boxes/analytics/boxes.jsonl` and repair/reset it to restore
   collection/injection.
 
 ### Scoring
@@ -376,12 +378,13 @@ Before completing any substantive response:
 
 ### Environment Variables
 
-| Variable               | Default | Description                         |
-| ---------------------- | ------- | ----------------------------------- |
-| `BOX_INJECT_LEARNINGS` | 3       | Max learnings to inject at start    |
-| `BOX_INJECT_BOXES`     | 5       | Max boxes to inject at start        |
-| `BOX_INJECT_DISABLED`  | false   | Set to "true" to disable injection  |
-| `BOX_RECENCY_DECAY`    | 0.95    | Weekly decay factor                 |
+| Variable                 | Default | Description                                             |
+| ------------------------ | ------- | ------------------------------------------------------- |
+| `BOX_INJECT_LEARNINGS`   | 3       | Max learnings to inject at start                        |
+| `BOX_INJECT_BOXES`       | 5       | Max boxes to inject at start                            |
+| `BOX_INJECT_DISABLED`    | false   | Set to "true" to disable hook-based injection           |
+| `RESPONSE_BOXES_DISABLED` | false  | Set to "true" to disable all adapters (hooks, plugins)  |
+| `BOX_RECENCY_DECAY`      | 0.95    | Weekly decay factor                                     |
 
 ### Settings
 
@@ -438,8 +441,8 @@ To get maximum benefit, integrate response boxes across **output style**, **rule
 ### 3. Wire CLAUDE.md so every session starts with the right mindset
 
 - **Goal:** Make “review prior boxes + apply learnings” a first-class pre-response habit.
-- **Action:** Add the snippet (`config/claude-md-snippet.md`) to your project’s Claude instructions
-  (commonly `.claude/CLAUDE.md`, or `CLAUDE.md` depending on how you run Claude Code).
+- **Action:** Add the snippet (`agents/claude-code/config/claude-md-snippet.md`) to your project’s Claude
+  instructions (commonly `.claude/CLAUDE.md`, or `CLAUDE.md` depending on how you run Claude Code).
 - **Recommendation:** Keep project-specific constraints adjacent to the snippet, for example:
   - Dependency/package manager expectations
   - Build/test commands
@@ -464,7 +467,7 @@ to consume and produce the same signals:
 
 - **Inputs (read-only)**
   - Read injected context (patterns + notable boxes)
-  - Read `~/.claude/analytics/boxes.jsonl` if the skill needs cross-session history
+  - Read `~/.response-boxes/analytics/boxes.jsonl` if the skill needs cross-session history
 
 - **Outputs (append-only)**
   - Prefer emitting new events (e.g. `LearningCreated`, `EvidenceLinked`, `LearningLinked`) over
@@ -490,22 +493,144 @@ to consume and produce the same signals:
 
 ---
 
-## Uninstall
+## Cross-Agent Architecture & Compatibility (planned)
+
+Response Boxes is implemented today for **Claude Code**, but the core design is
+deliberately agent-neutral so it can be adapted to other coding agents.
+
+### Core invariants (all agents)
+
+- **Single event store**: `~/.response-boxes/analytics/boxes.jsonl` is the
+  canonical append-only JSONL log for all agents.
+- **Human-in-the-loop writes**: only `BoxCreated` is emitted automatically;
+  higher-level learning events are created via explicit `/analyze-boxes` runs.
+- **Same box/learning schema**: adapters for other agents emit the same event
+  shapes so `inject-context.sh` and `/analyze-boxes` stay authoritative.
+
+### Claude Code (today)
+
+- **Hooks** in `~/.claude/hooks/` call `session-processor.sh` (SessionEnd) and
+  `inject-context.sh` (SessionStart) to collect boxes and inject context.
+- **Skill** `/analyze-boxes` lives at
+  `~/.claude/skills/analyze-boxes/SKILL.md` and appends learning events.
+- **Instructions** are wired through `CLAUDE.md`, rules, and the
+  `response-box` output style.
+
+### Cursor (planned adapter)
+
+- **Collector**: a Cursor hook using `afterAgentResponse` will extract boxes
+  from assistant messages and append `BoxCreated` events to the shared store.
+- **Injector**: a `sessionStart` hook will project learnings/boxes and return
+  them via `additional_context` so Cursor’s model sees prior learnings.
+- **Skills**: Cursor can load the same `analyze-boxes` skill via
+  `.cursor/skills/` or a shared Agent Skills layout.
+
+### Windsurf (planned adapter)
+
+- **Collector**: a `post_cascade_response` hook will send the full response
+  markdown through the same box parser and append `BoxCreated` events.
+- **Injection UX**: because Windsurf hooks cannot return prompt context, a
+  workflow (e.g. `/response-boxes-start`) in `.windsurf/workflows/` will
+  project learnings/boxes and present them for manual application.
+- **Rules**: `.windsurf/rules/response-boxes.md` keeps the spec close to where
+  Cascade reads instructions (always-on and file/glob-triggered guidance).
+
+### OpenCode (planned adapter)
+
+- **Collector**: an OpenCode plugin subscribes to assistant message events
+  (e.g. `message.updated`) and appends `BoxCreated` events into the shared
+  event store.
+- **Injector (dynamic context)**: the same plugin injects projected
+  learnings/boxes into the system prompt using
+  `experimental.chat.system.transform`, based on
+  `~/.response-boxes/analytics/boxes.jsonl`.
+- **Instructions (static spec/output style)**: Response Boxes instructions and
+  checklist are loaded via OpenCode’s agent instructions (for example,
+  `AGENTS.md` or an `opencode.json` `instructions` array), mirroring how
+  Claude Code uses `CLAUDE.md` + rules rather than pushing the full spec via
+  hooks or plugins.
+- **Rules & skills**: OpenCode can reuse `AGENTS.md`, `CLAUDE.md`, and
+  `.opencode/skills/` to load the Response Boxes spec and `/analyze-boxes`
+  skill, so it participates in the same event-sourced learning loop.
+
+### Optional OpenSkills support
+
+For agents that do **not** have native skills discovery, the
+[Agent Skills](https://agentskills.io) / OpenSkills ecosystem can be used to
+install `SKILL.md` files and advertise them via `AGENTS.md`. For
+Cursor/Windsurf/OpenCode, OpenSkills is treated as **optional**; native skills
+and plugins remain the primary integration path.
+
+## OpenCode Setup (Optional, Experimental)
+
+You can connect OpenCode to the same Response Boxes event store used by
+Claude Code so both agents share boxes and learnings.
+
+### 1. Prerequisites
+
+- OpenCode installed and configured on your machine.
+- Claude Response Boxes installed at user scope in **full mode** (hooks +
+  `/analyze-boxes`), so the event store exists and analysis can synthesize
+  `LearningCreated` events.
+
+### 2. Install the OpenCode plugin
+
+Run the installer with the OpenCode flag (user-level only):
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/AIntelligentTech/claude-response-boxes/main/install.sh | bash -s -- --uninstall
+# User-level, full mode (default)
+curl -sSL https://raw.githubusercontent.com/AIntelligentTech/claude-response-boxes/main/install.sh \
+  | bash -s -- --install-opencode
 ```
 
-This removes:
+Notes:
 
-- Output style and rules files
-- Hooks and skills
-- Hook registrations from settings.json
+- The plugin is installed to:
+  - `~/.config/opencode/plugin/response-boxes.plugin.ts`
+- The plugin is only installed in **full** mode:
+  - If you pass `--basic`, the installer will skip hooks, skills, analytics,
+    **and** the OpenCode plugin even when `--install-opencode` is set.
+- The plugin writes and reads from the same event store as Claude Code:
+  - `~/.response-boxes/analytics/boxes.jsonl`
+- To temporarily disable the plugin (and other adapters), set:
+  - `RESPONSE_BOXES_DISABLED=true` in your environment before launching OpenCode.
 
-Not removed:
+### 3. Make Response Boxes part of your OpenCode instructions
 
-- CLAUDE.md snippet (manual removal)
-- Analytics data (`~/.claude/analytics/`)
+The plugin handles **collection** and **dynamic context injection**, but you
+still need to teach OpenCode how to write boxes.
+
+Follow OpenCode’s documentation for configuring agent instructions
+(e.g. `AGENTS.md` or `opencode.json`) and include:
+
+- The Response Boxes rules/spec:
+  - `agents/claude-code/rules/response-boxes.md` (or your project `.claude/rules/response-boxes.md`)
+- Your Claude configuration snippet:
+  - The same content installed from `agents/claude-code/config/claude-md-snippet.md` into `CLAUDE.md`
+
+The exact syntax depends on how you configure agents in OpenCode; treat these
+files as **always-on instructions** for your Claude-like coding agent.
+
+### 4. Usage in OpenCode
+
+Once installed and configured:
+
+1. Open a project in OpenCode and start a coding session.
+2. Write responses using the Response Box format (Choice, Completion,
+   Sycophancy, etc.) just as you would in Claude Code.
+3. The OpenCode plugin will:
+   - Parse your assistant responses for boxes.
+   - Append `BoxCreated` events into `~/.response-boxes/analytics/boxes.jsonl`
+     with context indicating `source: "opencode_plugin"`.
+4. When `LearningCreated` events exist (typically from running
+   `/analyze-boxes` in Claude Code), the plugin will:
+   - Project **Patterns** and **Recent notable boxes** from the event store.
+   - Inject a short summary into the system prompt via
+     `experimental.chat.system.transform` once per OpenCode session.
+
+**Analysis and learning synthesis still happens via `/analyze-boxes` in
+Claude Code.** OpenCode then consumes those learnings and contributes new
+boxes back into the shared event store.
 
 ---
 
@@ -513,7 +638,7 @@ Not removed:
 
 - **[Architecture](docs/architecture.md)** — Technical architecture, design
   decisions, and data structures
-- **[Rules](rules/response-boxes.md)** — Complete box specifications and usage
+- **[Rules](agents/claude-code/rules/response-boxes.md)** — Complete box specifications and usage
   guidelines
 
 ---

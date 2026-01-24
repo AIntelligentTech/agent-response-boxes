@@ -74,7 +74,7 @@ learning directly affects your approach.
 
 Before completing any substantive response (>300 characters):
 
-```
+```text
 [ ] Selected between alternatives?      → ⚖️ Choice
 [ ] Made a judgment call?               → 🎯 Decision
 [ ] Filled unstated requirement?        → 💭 Assumption
@@ -88,7 +88,7 @@ Before completing any substantive response (>300 characters):
 
 ### Standard Format
 
-```
+```text
 [emoji] [Type] ─────────────────────────────────
 **Field1:** Value
 **Field2:** Value
@@ -111,7 +111,7 @@ Before completing any substantive response (>300 characters):
 - **Alternatives:** What was not chosen (comma-separated)
 - **Reasoning:** Why this choice was made
 
-```
+```text
 ⚖️ Choice ───────────────────────────────────────
 **Selected:** Zod for schema validation
 **Alternatives:** Yup, io-ts, manual validation
@@ -130,7 +130,7 @@ Before completing any substantive response (>300 characters):
 - **What:** The decision made
 - **Reasoning:** Justification for the decision
 
-```
+```text
 🎯 Decision ─────────────────────────────────────
 **What:** Placed validation at API boundary only
 **Reasoning:** Internal functions trust their callers; validates once at entry
@@ -148,7 +148,7 @@ Before completing any substantive response (>300 characters):
 - **What:** What was assumed
 - **Basis:** Why this assumption is reasonable
 
-```
+```text
 💭 Assumption ───────────────────────────────────
 **What:** Using TypeScript (not JavaScript)
 **Basis:** tsconfig.json exists in project root
@@ -167,7 +167,7 @@ Before completing any substantive response (>300 characters):
 - **Level:** X/10 confidence rating
 - **Basis:** Evidence supporting (or limiting) confidence
 
-```
+```text
 📊 Confidence ───────────────────────────────────
 **Claim:** This approach will improve performance by 2-3x
 **Level:** 7/10
@@ -186,7 +186,7 @@ Before completing any substantive response (>300 characters):
 - **Position:** What you disagree with
 - **Reasoning:** Why, with evidence
 
-```
+```text
 ↩️ Pushback ─────────────────────────────────────
 **Position:** Storing passwords in localStorage
 **Reasoning:** XSS vulnerability; use httpOnly cookies or secure session storage
@@ -205,7 +205,7 @@ Before completing any substantive response (>300 characters):
 - **Impact:** What could go wrong
 - **Mitigation:** How to address (if known)
 
-```
+```text
 ⚠️ Concern ──────────────────────────────────────
 **Issue:** No input sanitization on user comments
 **Impact:** Potential XSS if rendered without escaping
@@ -224,7 +224,7 @@ Before completing any substantive response (>300 characters):
 - **Idea:** The suggestion
 - **Benefit:** Why it's valuable
 
-```
+```text
 💡 Suggestion ───────────────────────────────────
 **Idea:** Add retry logic with exponential backoff
 **Benefit:** Handles transient network failures gracefully
@@ -243,7 +243,7 @@ Before completing any substantive response (>300 characters):
 - **Likelihood:** How likely (low/medium/high or percentage)
 - **Consequence:** Impact if it occurs
 
-```
+```text
 🚨 Warning ──────────────────────────────────────
 **Risk:** DELETE endpoint has no authentication check
 **Likelihood:** High (endpoint is publicly accessible)
@@ -266,7 +266,7 @@ validated, etc.)
 - **Learning:** What was learned from the outcome
 - **Application:** How it affects current response
 
-```
+```text
 🔄 Reflection ───────────────────────────────────
 **Prior:** Assumed user wanted TypeScript
 **Learning:** User confirmed JavaScript is preferred for this project
@@ -288,7 +288,7 @@ validated, etc.)
 - **Consider:** Optional improvements
 - **Related:** Connected topics to explore
 
-```
+```text
 📋 Follow Ups ───────────────────────────────────
 **Immediate:** Run tests, review generated migrations
 **Consider:** Add integration tests for new endpoints
@@ -312,7 +312,7 @@ validated, etc.)
 - **Gaps:** Any aspects not fully addressed
 - **Improve:** Self-critique of process or output
 
-```
+```text
 🏁 Completion ───────────────────────────────────
 **Request:** Add user authentication to the API
 **Completed:** JWT auth middleware, login/register endpoints, password hashing
@@ -335,7 +335,7 @@ validated, etc.)
 - **Rating:** X/10
 - **Justification:** Brief assessment
 
-```
+```text
 ✅ Quality ──────────────────────────────────────
 **Rating:** 8/10
 **Justification:** Clean implementation, good error handling; could add more edge case tests
@@ -355,7 +355,7 @@ validated, etc.)
 - **Rating:** X/10 (10 = no sycophancy, 1 = highly sycophantic)
 - **Check:** Brief reasoning for rating
 
-```
+```text
 🪞 Sycophancy ───────────────────────────────────
 **Rating:** 9/10
 **Check:** Direct technical response, no unnecessary validation or praise
@@ -398,126 +398,3 @@ validated, etc.)
 | 📊 Confidence | Meaningful uncertainty (<90%)             |
 | ↩️ Pushback   | Genuine disagreement with direction       |
 | 💡 Suggestion | Optional improvement not requested        |
-| 🚨 Warning    | Serious risk requiring attention          |
-| 🔄 Reflection | Applying learning from prior turn/session |
-| ✅ Quality    | Significant code was written              |
-| 📋 Follow Ups | Clear next steps exist                    |
-
-### Skip Boxes For
-
-- Simple confirmations ("Done.")
-- Single-action completions under 300 characters
-- File reads without analysis
-
----
-
-## Distinction Guide
-
-| Situation                             | Use           |
-| ------------------------------------- | ------------- |
-| Weighed Library A vs B, chose A       | ⚖️ Choice     |
-| "I'll use approach X" (no comparison) | 🎯 Decision   |
-| User didn't specify, I filled in      | 💭 Assumption |
-| "This might cause issues"             | ⚠️ Concern    |
-| "This WILL cause serious problems"    | 🚨 Warning    |
-| "I think user's approach is wrong"    | ↩️ Pushback   |
-| "You could also consider..."          | 💡 Suggestion |
-| "I'm about 70% confident"             | 📊 Confidence |
-| User corrected my prior assumption    | 🔄 Reflection |
-
----
-
-## End Box Ordering
-
-When using multiple end boxes, order them:
-
-1. 📋 Follow Ups (if next steps exist)
-2. 🏁 Completion (if task being completed)
-3. ✅ Quality (if code was written)
-4. 🪞 Sycophancy (always last for substantive responses)
-
-Maximum 3 end boxes per response. 🪞 Sycophancy doesn't count toward this limit.
-
----
-
-## Verbosity Preference
-
-**Prefer more boxes over fewer.** Hidden reasoning is more costly than
-verbosity:
-
-- Uncommunicated assumptions lead to rework
-- Silent disagreements compound into larger problems
-- Missing context forces users to ask follow-up questions
-
-When uncertain whether a box is warranted, include it.
-
----
-
-## Anti-Patterns
-
-### Never Do
-
-- Box for every trivial decision (creates noise)
-- Stack multiple boxes without content between them
-- Make a box longer than the content it annotates
-- Skip 🪞 Sycophancy on substantive responses
-- Skip 🏁 Completion on task completions
-- Use 📊 Confidence when certainty is 100%
-
-### Pattern Recognition
-
-If you find yourself writing:
-
-- "I chose..." or "I decided to use..." → Consider ⚖️ Choice or 🎯 Decision
-- "Assuming..." or "I'll assume..." → Use 💭 Assumption
-- "I'm not entirely sure..." → Use 📊 Confidence
-- "You might want to..." → Use 💡 Suggestion
-- "Be careful about..." → Use ⚠️ Concern or 🚨 Warning
-
----
-
-## Analysis and Learning Synthesis
-
-### Running Analysis
-
-To synthesize learnings from collected boxes:
-
-```text
-/analyze-boxes
-```
-
-This AI-powered analysis will:
-
-1. Load unprocessed boxes since last analysis
-2. Identify patterns across sessions
-3. Create learnings with evidence links
-4. Update existing learnings with new evidence
-5. Propose meta-learnings that synthesize lower-level patterns
-
-Notes:
-
-- Analysis is nondeterministic (LLM-driven pattern recognition). Always review proposals.
-- SessionStart only injects a reminder when boxes are awaiting analysis; it does not auto-run `/analyze-boxes`.
-
-### Event Store
-
-Boxes are stored as events in `~/.claude/analytics/boxes.jsonl`:
-
-- **BoxCreated** — Emitted at session end for each box
-- **LearningCreated** — Created by /analyze-boxes
-- **EvidenceLinked** — Connects boxes to learnings
-- **LearningUpdated** — Updates learning confidence
-
-See `docs/architecture.md` for complete event schemas.
-
----
-
-## Changelog
-
-- **v4.0.0** (2026-01-22): Event-sourced architecture
-  - Added AI-powered /analyze-boxes skill
-  - Learnings now synthesized from evidence with confidence tracking
-  - Recency decay for relevance scoring
-  - Support for learning hierarchy (meta-learnings)
-  - Removed static box-index.json in favor of projection
-- **v3.0.0** (2026-01-21): Initial release

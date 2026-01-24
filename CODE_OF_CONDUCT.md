@@ -45,8 +45,10 @@ an individual is officially representing the community in public spaces.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the community leaders responsible for enforcement at [INSERT CONTACT
-METHOD].
+reported to the community leaders responsible for enforcement at:
+
+- Email: conduct@aintelligenttech.com
+- GitHub Issues (for public concerns)
 
 All complaints will be reviewed and investigated promptly and fairly.
 

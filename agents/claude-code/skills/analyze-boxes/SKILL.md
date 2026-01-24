@@ -19,7 +19,7 @@ User runs `/analyze-boxes`
 ## Instructions
 
 You are analyzing response boxes from Claude Code sessions to identify patterns
-and create learnings. The boxes are stored in `~/.claude/analytics/boxes.jsonl`
+and create learnings. The boxes are stored in `~/.response-boxes/analytics/boxes.jsonl`
 as an event-sourced log.
 
 ### Step 1: Load and Understand the Data
@@ -33,13 +33,13 @@ LAST_ANALYSIS_EPOCH=$(jq -s -r '
   ([.[] | select(.event == "AnalysisCompleted")] | sort_by(.ts)) as $runs |
   if ($runs | length) > 0 then ts_epoch($runs[-1].through_ts // $runs[-1].ts)
   else ts_epoch("1970-01-01T00:00:00Z") end
-' ~/.claude/analytics/boxes.jsonl 2>/dev/null || echo '0')
+' ~/.response-boxes/analytics/boxes.jsonl 2>/dev/null || echo '0')
 
 # Count boxes since last analysis (legacy lines without .event are treated as BoxCreated)
 jq -s --argjson since "$LAST_ANALYSIS_EPOCH" '
   def ts_epoch($v): ($v // "1970-01-01T00:00:00Z") | sub("\\.[0-9]+"; "") | fromdateiso8601;
   [.[] | select(((.event // "BoxCreated") == "BoxCreated") and (ts_epoch(.ts) > $since))] | length
-' ~/.claude/analytics/boxes.jsonl
+' ~/.response-boxes/analytics/boxes.jsonl
 ```
 
 Read the full event store to understand:
@@ -120,22 +120,22 @@ For approved items, generate and append events:
 
 ```bash
 # Example: Emit LearningCreated
-cat >> ~/.claude/analytics/boxes.jsonl << 'EOF'
+cat >> ~/.response-boxes/analytics/boxes.jsonl << 'EOF'
 {"event":"LearningCreated","id":"learning_XXX","ts":"2026-01-22T15:00:00Z","insight":"User prefers Zod for validation","confidence":0.85,"scope":"global","tags":["validation","typescript"],"level":0}
 EOF
 
 # Example: Emit EvidenceLinked
-cat >> ~/.claude/analytics/boxes.jsonl << 'EOF'
+cat >> ~/.response-boxes/analytics/boxes.jsonl << 'EOF'
 {"event":"EvidenceLinked","id":"link_XXX","ts":"2026-01-22T15:00:00Z","learning_id":"learning_001","box_id":"sess_abc123_5","strength":0.9,"relationship":"supports"}
 EOF
 
 # Example: Emit LearningUpdated
-cat >> ~/.claude/analytics/boxes.jsonl << 'EOF'
+cat >> ~/.response-boxes/analytics/boxes.jsonl << 'EOF'
 {"event":"LearningUpdated","id":"lupdate_XXX","ts":"2026-01-22T15:00:00Z","learning_id":"learning_001","updates":{"confidence":0.92}}
 EOF
 
 # Example: Emit AnalysisCompleted
-cat >> ~/.claude/analytics/boxes.jsonl << 'EOF'
+cat >> ~/.response-boxes/analytics/boxes.jsonl << 'EOF'
 {"event":"AnalysisCompleted","id":"analysis_XXX","ts":"2026-01-22T15:00:00Z","through_ts":"2026-01-22T14:30:00Z","stats":{"boxes_analyzed":47,"learnings_created":3,"learnings_updated":2,"links_created":12}}
 EOF
 ```
@@ -153,7 +153,7 @@ Use these patterns for IDs:
 Find the next number:
 
 ```bash
-jq -s '[.[] | select(.id | startswith("learning_"))] | length + 1' ~/.claude/analytics/boxes.jsonl
+jq -s '[.[] | select(.id | startswith("learning_"))] | length + 1' ~/.response-boxes/analytics/boxes.jsonl
 ```
 
 ---
@@ -258,83 +258,3 @@ Relationship types:
 | 5+ strong supporting boxes | 0.9+       |
 | 3-4 supporting boxes       | 0.75-0.85  |
 | 2 supporting boxes         | 0.6-0.7    |
-| 1 box (needs confirmation) | 0.4-0.5    |
-| Contradicting evidence     | Reduce 0.2 |
-
-### Scope Assignment
-
-- `global` — Pattern applies across all repos
-- `repo` — Pattern specific to one repo
-
-Use repo scope when:
-
-- Pattern only appears in one repository
-- It reflects project-specific conventions
-- Different repos show different patterns
-
-### Evidence Strength
-
-| Strength | Meaning                           |
-| -------- | --------------------------------- |
-| 0.9-1.0  | Direct, clear support             |
-| 0.7-0.8  | Good support with minor ambiguity |
-| 0.5-0.6  | Moderate support                  |
-| 0.3-0.4  | Tangential relation               |
-| 0.1-0.2  | Weak connection                   |
-
-### Meta-Learning Criteria
-
-Create level 1+ learnings when:
-
-- 3+ level-0 learnings share a common theme
-- A higher-level pattern explains multiple specific patterns
-- User behavior suggests a general principle
-
----
-
-## Example Analysis Output
-
-```text
-# Box Analysis Results
-
-Analyzed 47 boxes since last analysis (2026-01-20).
-
-## Pattern 1: Zod Preference for Validation
-
-**Insight:** User consistently prefers Zod for schema validation over alternatives
-
-**Evidence:**
-- sess_abc_2: Choice - Chose Zod over Yup (strength: 0.9, supports)
-- sess_def_1: Choice - Chose Zod over joi (strength: 0.9, supports)
-- sess_ghi_3: Assumption - Assumed Zod for validation (strength: 0.7, supports)
-
-**Confidence:** 0.85
-**Scope:** global
-**Tags:** validation, typescript, libraries
-**Level:** 0
-
----
-
-## Pattern 2: Functional Style in API Repo
-
-**Insight:** This repository follows functional programming patterns
-
-**Evidence:**
-- sess_jkl_5: Decision - Used pure functions (strength: 0.8, supports)
-- sess_mno_2: Choice - Chose fp-ts over class-based (strength: 0.9, supports)
-
-**Confidence:** 0.78
-**Scope:** repo
-**Tags:** architecture, functional
-**Level:** 0
-
----
-
-## Proposed Events
-
-Approve to add (respond with numbers or 'all'):
-
-1. [x] Create learning: "User prefers Zod for validation"
-2. [x] Create learning: "API repo uses functional patterns"
-3. [ ] Update learning_003 confidence to 0.88 (2 new evidence)
-```

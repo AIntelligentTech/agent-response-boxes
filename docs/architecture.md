@@ -42,7 +42,7 @@ project `README.md`.
 │  ┌─────────────────────────────────────────────────────────────────────┐    │
 │  │                      LAYER 1: PROMPT GUIDANCE                        │    │
 │  │                                                                      │    │
-│  │  output-styles/response-box.md    rules/response-boxes.md           │    │
+│  │  agents/claude-code/output-styles/response-box.md    agents/claude-code/rules/response-boxes.md           │
 │  │  ├─ Turn Start Self-Reflection    ├─ Complete box specifications   │    │
 │  │  ├─ Learning Context Handling     ├─ Metacognition protocol        │    │
 │  │  ├─ Box Quick Reference           ├─ Usage guidelines              │    │
@@ -424,7 +424,7 @@ Where:
 
 ### Session Processor (SessionEnd Hook)
 
-**File:** `hooks/session-processor.sh`
+**File:** `agents/claude-code/hooks/session-processor.sh`
 
 **Trigger:** Session end (logout, clear, exit)
 
@@ -459,7 +459,7 @@ Where:
 
 ### Context Injector (SessionStart Hook)
 
-**File:** `hooks/inject-context.sh`
+**File:** `agents/claude-code/hooks/inject-context.sh`
 
 **Trigger:** Session start (startup, resume, clear, compact)
 
@@ -498,7 +498,7 @@ Review and apply using 🔄 Reflection where relevant.
 
 ### Analysis Skill (/analyze-boxes)
 
-**File:** `skills/analyze-boxes/`
+**File:** `agents/claude-code/skills/analyze-boxes/`
 
 **Trigger:** User runs `/analyze-boxes`
 
@@ -667,8 +667,6 @@ issues:
 
 ```
 ~/.claude/
-├── analytics/
-│   └── boxes.jsonl              # Event store (single source of truth)
 ├── hooks/
 │   ├── session-processor.sh     # SessionEnd: emit BoxCreated events
 │   └── inject-context.sh        # SessionStart: project and inject
@@ -679,6 +677,10 @@ issues:
 ├── skills/
 │   └── analyze-boxes/
 │       └── SKILL.md             # AI-powered analysis skill
+
+~/.response-boxes/
+└── analytics/
+    └── boxes.jsonl              # Event store (single source of truth)
 ```
 
 ---

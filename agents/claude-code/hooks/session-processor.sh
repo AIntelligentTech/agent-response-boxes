@@ -21,7 +21,7 @@
 #   0 - Always (processing is best-effort, never blocks)
 #
 # EVENT STORE:
-#   ~/.claude/analytics/boxes.jsonl - Append-only event log
+#   ~/.response-boxes/analytics/boxes.jsonl - Append-only event log
 #
 # EVENTS EMITTED:
 #   BoxCreated - One per box found in the transcript
@@ -33,8 +33,13 @@ set -euo pipefail
 # Configuration
 # ─────────────────────────────────────────────────────────────────────────────
 
-ANALYTICS_DIR="${HOME}/.claude/analytics"
-BOXES_FILE="${ANALYTICS_DIR}/boxes.jsonl"
+DEFAULT_BASE_DIR="${HOME}/.response-boxes"
+DEFAULT_ANALYTICS_DIR="${DEFAULT_BASE_DIR}/analytics"
+DEFAULT_BOXES_FILE="${DEFAULT_ANALYTICS_DIR}/boxes.jsonl"
+LEGACY_BOXES_FILE="${HOME}/.claude/analytics/boxes.jsonl"
+
+ANALYTICS_DIR="${RESPONSE_BOXES_ANALYTICS_DIR:-${DEFAULT_ANALYTICS_DIR}}"
+BOXES_FILE="${RESPONSE_BOXES_FILE:-${DEFAULT_BOXES_FILE}}"
 
 SCHEMA_VERSION=1
 
@@ -62,6 +67,19 @@ declare -A INITIAL_SCORES=(
 
 log() {
     echo "[session-processor] $*" >&2
+}
+
+legacy_store_is_valid_jsonl() {
+    local file="$1"
+    if [[ ! -f "$file" ]] || [[ ! -s "$file" ]]; then
+        return 1
+    fi
+
+    if head -c 1 "$file" 2>/dev/null | grep -q '^\['; then
+        return 1
+    fi
+
+    jq -s 'length' "$file" &>/dev/null
 }
 
 emoji_to_type() {
@@ -237,78 +255,53 @@ main() {
     fi
 
     # Ensure analytics directory exists
-    mkdir -p "$ANALYTICS_DIR"
+    mkdir -p "$(dirname "$BOXES_FILE")"
 
-    if [[ -f "$BOXES_FILE" ]] && [[ -s "$BOXES_FILE" ]]; then
-        if head -c 1 "$BOXES_FILE" 2>/dev/null | grep -q '^\['; then
-            log "Analytics event store is JSON array, expected JSONL. Back up $BOXES_FILE and migrate to JSONL before continuing."
-            exit 0
-        fi
-
-        if ! jq -s 'length' "$BOXES_FILE" &>/dev/null; then
-            log "Analytics event store is not valid JSON lines. Back up $BOXES_FILE and repair or reset to restore collection."
-            exit 0
-        fi
-
-        local max_schema_version
-        max_schema_version=$(jq -s -r '[.[] | (.schema_version // 0)] | max // 0' "$BOXES_FILE" 2>/dev/null || echo "0")
-        if [[ -n "$max_schema_version" ]] && [[ "$max_schema_version" != "null" ]] && [[ "$max_schema_version" -gt "$SCHEMA_VERSION" ]]; then
-            log "Analytics schema version ${max_schema_version} is newer than this collector supports. Update Claude Response Boxes to restore collection."
-            exit 0
-        fi
+    # One-way compatibility migration: if legacy exists and canonical doesn't,
+    # and legacy looks like valid JSONL, then copy it.
+    if [[ ! -f "$BOXES_FILE" ]] && legacy_store_is_valid_jsonl "$LEGACY_BOXES_FILE"; then
+        log "Migrating legacy analytics store to canonical location"
+        cp "$LEGACY_BOXES_FILE" "$BOXES_FILE"
     fi
 
-    # Read input from stdin
     local input
-    input=$(cat)
+    input="$(cat 2>/dev/null || echo '{}')"
 
-    # Extract session info
-    local session_id transcript_path cwd
-    session_id=$(echo "$input" | jq -r '.session_id // "unknown"')
-    transcript_path=$(echo "$input" | jq -r '.transcript_path // empty')
-    cwd=$(echo "$input" | jq -r '.cwd // empty')
+    local session_id transcript_path cwd reason
+    session_id="$(echo "$input" | jq -r '.session_id // ""' 2>/dev/null || echo "")"
+    transcript_path="$(echo "$input" | jq -r '.transcript_path // ""' 2>/dev/null || echo "")"
+    cwd="$(echo "$input" | jq -r '.cwd // ""' 2>/dev/null || echo "")"
+    reason="$(echo "$input" | jq -r '.reason // ""' 2>/dev/null || echo "")"
 
-    if [[ -z "$transcript_path" ]] || [[ ! -f "$transcript_path" ]]; then
-        log "No transcript available, skipping"
+    if [[ -z "$session_id" || -z "$transcript_path" ]]; then
+        log "Missing session_id or transcript_path in input; skipping"
         exit 0
     fi
 
-    # Get git context
-    local git_remote="" git_branch=""
-    if [[ -n "$cwd" ]] && [[ -d "$cwd" ]]; then
-        git_remote=$(cd "$cwd" && git remote get-url origin 2>/dev/null | sed -E 's|^(https?://\|git@)||; s|:|/|; s|\.git$||' || echo "")
-        git_branch=$(cd "$cwd" && git branch --show-current 2>/dev/null || echo "")
+    local git_remote=""
+    local git_branch=""
+    if [[ -n "$cwd" ]] && command -v git &>/dev/null; then
+        if git -C "$cwd" rev-parse --is-inside-work-tree &>/dev/null; then
+            git_remote="$(git -C "$cwd" config --get remote.origin.url 2>/dev/null || echo "")"
+            git_branch="$(git -C "$cwd" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")"
+        fi
     fi
 
     local timestamp
-    timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
-    log "Processing session $session_id..."
-
-    # Extract all assistant messages
     local content
-    content=$(extract_assistant_messages "$transcript_path")
+    content="$(extract_assistant_messages "$transcript_path" 2>/dev/null || echo "")"
 
     if [[ -z "$content" ]]; then
-        log "No assistant messages found"
+        log "No assistant messages found in transcript; nothing to process"
         exit 0
     fi
 
-    # Parse boxes and emit events
-    local box_count=0
-    while IFS= read -r event_json; do
-        if [[ -n "$event_json" ]]; then
-            box_count=$((box_count + 1))
-        fi
-    done < <(parse_boxes_from_content "$content" "$session_id" "$git_remote" "$git_branch" "$timestamp")
+    local count
+    count="$(parse_boxes_from_content "$content" "$session_id" "$git_remote" "$git_branch" "$timestamp" | wc -l | tr -d ' ')"
 
-    if [[ "$box_count" -eq 0 ]]; then
-        log "No boxes found in session"
-        exit 0
-    fi
-
-    log "Emitted $box_count BoxCreated events"
-    exit 0
+    log "Emitted $count BoxCreated events for session $session_id (reason: $reason)"
 }
 
 main "$@"
