@@ -45,6 +45,7 @@ CLEANUP_LEGACY=false
 INSTALL_OPENCODE_PLUGIN=false
 INSTALL_MODE="full"
 INSTALL_WINDSURF_BASIC=false
+INSTALL_WINDSURF_FULL=false
 INSTALL_CURSOR_BASIC=false
 
 # Colors
@@ -117,6 +118,7 @@ parse_args() {
             --basic)     INSTALL_MODE="basic"; shift ;;
             --install-opencode) INSTALL_OPENCODE_PLUGIN=true; shift ;;
             --install-windsurf-basic) INSTALL_WINDSURF_BASIC=true; shift ;;
+            --install-windsurf) INSTALL_WINDSURF_FULL=true; shift ;;
             --install-cursor-basic) INSTALL_CURSOR_BASIC=true; shift ;;
             --help|-h)   show_help; exit 0 ;;
             *)           warn "Unknown option: $1"; shift ;;
@@ -143,6 +145,7 @@ OPTIONS:
   --install-opencode Also install the OpenCode response-boxes plugin (user-level)
   --install-windsurf-basic
                      Install Response Boxes basic-mode rule for Windsurf
+  --install-windsurf Install Response Boxes full mode for Windsurf (hooks + workflow)
   --install-cursor-basic
                      Install Response Boxes basic-mode rule for Cursor (project-level)
   --help, -h         Show this help
@@ -752,6 +755,67 @@ install_cursor_basic() {
     install_managed_file "agents/cursor/rules/response-boxes.mdc" "$dst"
 }
 
+install_windsurf_full() {
+    if [[ "$INSTALL_SCOPE" != "user" ]]; then
+        info "Windsurf full mode is user-level only; skipping for project scope"
+        return 0
+    fi
+
+    log "Installing Windsurf full mode (hooks + workflow)..."
+
+    # Create directories
+    local windsurf_hooks_dir="${HOME}/.response-boxes/hooks"
+    local windsurf_workflow_dir
+
+    # Support both Codeium and Codium Windsurf locations
+    local windsurf_config_dirs=(
+        "${HOME}/.codeium/windsurf"
+        "${HOME}/.codium/.windsurf-next"
+    )
+
+    run_cmd mkdir -p "$windsurf_hooks_dir"
+
+    # Install the collector hook script
+    install_managed_file "agents/windsurf/hooks/windsurf-collector.sh" "${windsurf_hooks_dir}/windsurf-collector.sh" "+x"
+
+    # Install hooks.json and workflow to each Windsurf config location that exists
+    for config_dir in "${windsurf_config_dirs[@]}"; do
+        if [[ -d "$config_dir" ]] || [[ "$DRY_RUN" == "true" ]]; then
+            # Install hooks.json
+            local hooks_dir="${config_dir}/hooks"
+            run_cmd mkdir -p "$hooks_dir"
+
+            if [[ "$DRY_RUN" == "true" ]]; then
+                info "Would install Windsurf hooks.json to: ${hooks_dir}/hooks.json"
+            else
+                # Create hooks.json with correct path
+                cat > "${hooks_dir}/hooks.json" << EOF
+{
+  "hooks": {
+    "post_cascade_response": {
+      "command": "${windsurf_hooks_dir}/windsurf-collector.sh",
+      "description": "Collect response boxes from Cascade responses"
+    }
+  }
+}
+EOF
+                log "  → Installed hooks.json to ${hooks_dir}/hooks.json"
+            fi
+
+            # Install workflow
+            windsurf_workflow_dir="${config_dir}/workflows"
+            run_cmd mkdir -p "$windsurf_workflow_dir"
+            install_managed_file "agents/windsurf/workflows/response-boxes-start.md" "${windsurf_workflow_dir}/response-boxes-start.md"
+        fi
+    done
+
+    # Also install the enhanced rules
+    install_windsurf_basic
+
+    log "Windsurf full mode installation complete"
+    info "Run /response-boxes-start in Windsurf to load prior learnings"
+}
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Uninstall
 # ─────────────────────────────────────────────────────────────────────────────
@@ -890,6 +954,13 @@ main() {
         echo ""
         info "Installing Cursor basic-mode integration..."
         install_cursor_basic
+    fi
+
+    # Windsurf full mode (hooks + workflow)
+    if [[ "$INSTALL_WINDSURF_FULL" == "true" ]]; then
+        echo ""
+        info "Installing Windsurf full-mode integration..."
+        install_windsurf_full
     fi
 
     if [[ "$CLEANUP_LEGACY" == "true" ]]; then

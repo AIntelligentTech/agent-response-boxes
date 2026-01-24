@@ -1,6 +1,8 @@
 ---
 name: Response Boxes (Basic Mode)
-description: Teach Cascade to use Response Boxes structure within this workspace without any cross-session learning or external event store.
+description:
+  Teach Cascade to use Response Boxes structure within this workspace without
+  any cross-session learning or external event store.
 trigger: always_on
 globs:
   - "**/*"
@@ -96,14 +98,51 @@ boxes terse (one or two concise sentences) while honoring the structure.
 - If there is a conflict, **follow project-specific safety and style rules
   first**, while still using boxes where possible.
 
-## No cross-session learning in basic mode
+## Cross-session learning
 
-In this basic mode profile:
+### Basic mode (default)
+
+In basic mode:
 
 - Do **not** talk about "event stores", `boxes.jsonl`, or persistent
   cross-session analytics unless the user explicitly asks.
 - Treat any pattern recognition or learning as **ephemeral**, scoped to the
   current conversation only.
-- If the user later installs a full Response Boxes integration with hooks or
-  skills, this rule should still remain valid as the **within-session** behavior
-  for Cascade in Windsurf.
+
+### Full mode (with hooks)
+
+If you have installed Response Boxes in full mode (`--install-windsurf`), you
+have access to cross-session learning:
+
+**Automatic collection:**
+
+- The `post_cascade_response` hook captures boxes from your responses
+- Events are appended to `~/.response-boxes/analytics/boxes.jsonl`
+- Collection happens automatically; no action required
+
+**Manual injection:**
+
+- Run `/response-boxes-start` workflow at the beginning of a session
+- This projects learnings and notable boxes from prior sessions
+- Apply relevant learnings using a 🔄 Reflection box
+
+**Analysis:**
+
+- Run `/analyze-boxes` in Claude Code to synthesize learnings from boxes
+- Learnings are stored with confidence scores and evidence links
+- Top learnings are projected during `/response-boxes-start`
+
+### Workflows
+
+| Workflow                | Description                           |
+| ----------------------- | ------------------------------------- |
+| `/response-boxes-start` | Load prior learnings at session start |
+
+### Environment variables
+
+| Variable                  | Default                                   | Description              |
+| ------------------------- | ----------------------------------------- | ------------------------ |
+| `BOX_INJECT_LEARNINGS`    | 3                                         | Max learnings to project |
+| `BOX_INJECT_BOXES`        | 5                                         | Max boxes to project     |
+| `RESPONSE_BOXES_DISABLED` | false                                     | Disable collection hook  |
+| `RESPONSE_BOXES_FILE`     | `~/.response-boxes/analytics/boxes.jsonl` | Event store path         |
