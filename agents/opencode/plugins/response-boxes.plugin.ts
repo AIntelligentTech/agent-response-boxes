@@ -1,5 +1,6 @@
 import type { Plugin } from "@opencode-ai/plugin";
 import { promises as fs } from "fs";
+import * as crypto from "crypto";
 import * as os from "os";
 import * as path from "path";
 
@@ -40,10 +41,42 @@ interface BoxCreatedEvent {
   readonly schema_version: number;
 }
 
-const DEFAULT_ANALYTICS_DIR = path.join(os.homedir(), ".response-boxes", "analytics");
+const DEFAULT_ANALYTICS_DIR = path.join(
+  os.homedir(),
+  ".response-boxes",
+  "analytics",
+);
 const DEFAULT_BOXES_FILE = path.join(DEFAULT_ANALYTICS_DIR, "boxes.jsonl");
 
 const BOXES_FILE = process.env.RESPONSE_BOXES_FILE ?? DEFAULT_BOXES_FILE;
+const SCHEMA_VERSION = 1;
+
+// Generate a unique ID using crypto for collision resistance
+function generateUniqueId(prefix: string): string {
+  const timestamp = Date.now().toString(36);
+  const random = crypto.randomBytes(4).toString("hex");
+  return `${prefix}_${timestamp}_${random}`;
+}
+
+// Calculate initial score based on box type (matches scoring in hooks)
+function calculateInitialScore(boxType: string): number {
+  const highValueTypes = ["Reflection", "Warning", "Pushback", "Assumption"];
+  const mediumValueTypes = [
+    "Choice",
+    "Completion",
+    "Concern",
+    "Confidence",
+    "Decision",
+  ];
+
+  if (highValueTypes.includes(boxType)) {
+    return 85;
+  }
+  if (mediumValueTypes.includes(boxType)) {
+    return 60;
+  }
+  return 40;
+}
 
 async function ensureAnalyticsDir(): Promise<void> {
   const dir = path.dirname(BOXES_FILE);
@@ -53,7 +86,7 @@ async function ensureAnalyticsDir(): Promise<void> {
 function extractBoxesFromText(text: string): BoxSegment[] {
   const segments: BoxSegment[] = [];
 
-  // Match headers like: " Choice ─────────────" (type + dashes)
+  // Match headers like: "⚖️ Choice ─────────────" (emoji + type + dashes)
   const headerPattern = /^(.+?)\s+([A-Za-z][A-Za-z ]*)\s+[-\u2500]{10,}\s*$/gm;
 
   const matches = Array.from(text.matchAll(headerPattern));
@@ -64,14 +97,14 @@ function extractBoxesFromText(text: string): BoxSegment[] {
   for (let index = 0; index < matches.length; index += 1) {
     const match = matches[index];
     if (match.index === undefined) {
-      // Should not happen, but guard anyway
       continue;
     }
 
     const start = match.index;
-    const end = index + 1 < matches.length && matches[index + 1].index !== undefined
-      ? matches[index + 1].index as number
-      : text.length;
+    const end =
+      index + 1 < matches.length && matches[index + 1].index !== undefined
+        ? (matches[index + 1].index as number)
+        : text.length;
 
     const block = text.slice(start, end).trim();
     if (block.length === 0) {
@@ -79,16 +112,15 @@ function extractBoxesFromText(text: string): BoxSegment[] {
     }
 
     const headerLineEnd = block.indexOf("\n");
-    const headerLine = headerLineEnd === -1 ? block : block.slice(0, headerLineEnd);
     const boxTypeRaw = match[2] ?? "";
     const boxType = boxTypeRaw.trim();
 
-    const body = headerLineEnd === -1 ? "" : block.slice(headerLineEnd + 1).trim();
+    const body =
+      headerLineEnd === -1 ? "" : block.slice(headerLineEnd + 1).trim();
     const fields: Record<string, string> = {};
 
     const fieldPattern = /\*\*([^*]+)\*\*:\s*(.+)/g;
     let fieldMatch: RegExpExecArray | null;
-    // eslint-disable-next-line no-cond-assign
     while ((fieldMatch = fieldPattern.exec(body)) !== null) {
       const rawName = fieldMatch[1]?.trim();
       const value = fieldMatch[2]?.trim() ?? "";
@@ -123,6 +155,7 @@ async function appendBoxEvents(events: BoxCreatedEvent[]): Promise<void> {
 
   await fs.appendFile(BOXES_FILE, withNewline, { encoding: "utf8" });
 }
+
 async function projectContextFromEvents(): Promise<string | null> {
   let raw: string;
   try {
@@ -141,44 +174,59 @@ async function projectContextFromEvents(): Promise<string | null> {
       continue;
     }
 
-    let parsed: any;
+    let parsed: unknown;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       parsed = JSON.parse(trimmed);
     } catch {
       continue;
     }
 
-    const eventType = typeof parsed.event === "string" ? parsed.event : "BoxCreated";
+    if (typeof parsed !== "object" || parsed === null) {
+      continue;
+    }
+
+    const record = parsed as Record<string, unknown>;
+    const eventType =
+      typeof record.event === "string" ? record.event : "BoxCreated";
 
     if (eventType === "BoxCreated") {
-      const ts = typeof parsed.ts === "string" ? parsed.ts : new Date(0).toISOString();
-      const boxType = typeof parsed.box_type === "string"
-        ? parsed.box_type
-        : typeof parsed.type === "string"
-          ? parsed.type
-          : "Unknown";
-      const fields = (parsed.fields && typeof parsed.fields === "object") ? parsed.fields as Record<string, string> : {};
+      const ts =
+        typeof record.ts === "string" ? record.ts : new Date(0).toISOString();
+      const boxType =
+        typeof record.box_type === "string"
+          ? record.box_type
+          : typeof record.type === "string"
+            ? record.type
+            : "Unknown";
+      const fields =
+        record.fields && typeof record.fields === "object"
+          ? (record.fields as Record<string, string>)
+          : {};
 
       boxes.push({
         event: "BoxCreated",
-        id: typeof parsed.id === "string" ? parsed.id : `oc_legacy_${ts}`,
+        id: typeof record.id === "string" ? record.id : `oc_legacy_${ts}`,
         ts,
         box_type: boxType,
         fields,
-        context: (parsed.context && typeof parsed.context === "object")
-          ? parsed.context as Record<string, unknown>
-          : {},
-        initial_score: typeof parsed.initial_score === "number" ? parsed.initial_score : 50,
-        schema_version: typeof parsed.schema_version === "number" ? parsed.schema_version : 0,
+        context:
+          record.context && typeof record.context === "object"
+            ? (record.context as Record<string, unknown>)
+            : {},
+        initial_score:
+          typeof record.initial_score === "number" ? record.initial_score : 50,
+        schema_version:
+          typeof record.schema_version === "number" ? record.schema_version : 0,
       });
     } else if (eventType === "LearningCreated") {
-      const insight = typeof parsed.insight === "string" ? parsed.insight : "";
+      const insight = typeof record.insight === "string" ? record.insight : "";
       if (insight === "") {
         continue;
       }
-      const confidence = typeof parsed.confidence === "number" ? parsed.confidence : 0.0;
-      const ts = typeof parsed.ts === "string" ? parsed.ts : new Date(0).toISOString();
+      const confidence =
+        typeof record.confidence === "number" ? record.confidence : 0.0;
+      const ts =
+        typeof record.ts === "string" ? record.ts : new Date(0).toISOString();
       learnings.push({ insight, confidence, ts });
     }
   }
@@ -187,9 +235,12 @@ async function projectContextFromEvents(): Promise<string | null> {
     return null;
   }
 
-  const maxLearnings = Number.parseInt(process.env.BOX_INJECT_LEARNINGS ?? "3", 10) || 3;
-  const maxBoxes = Number.parseInt(process.env.BOX_INJECT_BOXES ?? "5", 10) || 5;
+  const maxLearnings =
+    Number.parseInt(process.env.BOX_INJECT_LEARNINGS ?? "3", 10) || 3;
+  const maxBoxes =
+    Number.parseInt(process.env.BOX_INJECT_BOXES ?? "5", 10) || 5;
 
+  // Sort learnings by confidence (desc), then by timestamp (desc)
   learnings.sort((a, b) => {
     if (b.confidence !== a.confidence) {
       return b.confidence - a.confidence;
@@ -197,6 +248,7 @@ async function projectContextFromEvents(): Promise<string | null> {
     return (new Date(b.ts).getTime() || 0) - (new Date(a.ts).getTime() || 0);
   });
 
+  // Sort boxes by timestamp (desc)
   boxes.sort((a, b) => {
     return (new Date(b.ts).getTime() || 0) - (new Date(a.ts).getTime() || 0);
   });
@@ -211,7 +263,9 @@ async function projectContextFromEvents(): Promise<string | null> {
   if (topLearnings.length > 0) {
     linesOut.push("Patterns (AI-synthesized learnings)");
     for (const l of topLearnings) {
-      const conf = Number.isFinite(l.confidence) ? l.confidence.toFixed(2) : "--";
+      const conf = Number.isFinite(l.confidence)
+        ? l.confidence.toFixed(2)
+        : "--";
       linesOut.push(`• [${conf}] ${l.insight}`);
     }
     linesOut.push("");
@@ -221,12 +275,18 @@ async function projectContextFromEvents(): Promise<string | null> {
     linesOut.push("Recent notable boxes");
     for (const box of topBoxes) {
       const entries = Object.entries(box.fields);
-      const summaryValues = entries.slice(0, 2).map(([key, value]) => `${key}: ${value}`);
+      const summaryValues = entries
+        .slice(0, 2)
+        .map(([key, value]) => `${key}: ${value}`);
       const summary = summaryValues.join(" | ");
       linesOut.push(`• ${box.box_type}: ${summary}`);
     }
     linesOut.push("");
   }
+
+  linesOut.push(
+    "Apply relevant learnings using a 🔄 Reflection box in your response.",
+  );
 
   return linesOut.join("\n");
 }
@@ -234,7 +294,11 @@ async function projectContextFromEvents(): Promise<string | null> {
 const plugin: Plugin = (context) => {
   const { directory, worktree } = context;
 
+  // Track which sessions have had context injected
   const injectedSessions = new Set<string>();
+
+  // Track message counts per session for deduplication
+  const sessionMessageCounts = new Map<string, number>();
 
   return {
     // Unified event hook for message capture
@@ -253,7 +317,9 @@ const plugin: Plugin = (context) => {
       }
 
       const parts = info.parts ?? [];
-      const textParts = parts.filter((part) => part.type === "text" && typeof part.text === "string");
+      const textParts = parts.filter(
+        (part) => part.type === "text" && typeof part.text === "string",
+      );
 
       if (textParts.length === 0) {
         return;
@@ -272,9 +338,14 @@ const plugin: Plugin = (context) => {
       const nowIso = new Date().toISOString();
       const sessionId = event.sessionID ?? info.sessionID ?? "unknown";
 
+      // Track message count for this session to create unique IDs
+      const currentCount = sessionMessageCounts.get(sessionId) ?? 0;
+      sessionMessageCounts.set(sessionId, currentCount + 1);
+
       const baseContext: Record<string, unknown> = {
         source: "opencode_plugin",
         session_id: sessionId,
+        message_index: currentCount,
         agent: "OpenCode",
         directory,
         worktree,
@@ -282,20 +353,19 @@ const plugin: Plugin = (context) => {
 
       const eventsToWrite: BoxCreatedEvent[] = boxes.map((box, index) => ({
         event: "BoxCreated",
-        id: `oc_${sessionId}_${Date.now()}_${index}`,
+        id: generateUniqueId(`oc_${sessionId.slice(0, 8)}`),
         ts: nowIso,
         box_type: box.boxType,
         fields: box.fields,
         context: baseContext,
-        initial_score: 50,
-        schema_version: 1,
+        initial_score: calculateInitialScore(box.boxType),
+        schema_version: SCHEMA_VERSION,
       }));
 
       await appendBoxEvents(eventsToWrite);
     },
 
-    // System prompt transform: inject projected learnings/boxes computed
-    // directly from the shared event store.
+    // System prompt transform: inject projected learnings/boxes
     "experimental.chat.system.transform": async (
       input: { sessionID: string },
       output: { system: string[] },
@@ -316,6 +386,14 @@ const plugin: Plugin = (context) => {
 
       injectedSessions.add(sessionID);
       output.system.push(contextText);
+    },
+
+    // Optional: Use chat.headers for session correlation (stable API, Jan 2026)
+    "chat.headers": (input: { sessionID: string }) => {
+      return {
+        "X-Response-Boxes-Session": input.sessionID,
+        "X-Response-Boxes-Version": SCHEMA_VERSION.toString(),
+      };
     },
   };
 };
