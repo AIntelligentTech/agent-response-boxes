@@ -8,25 +8,33 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-01-24
+
 ### Added
 
-- GitHub Actions CI/CD pipeline
-- Bash testing framework (bats)
-- TypeScript tests for OpenCode plugin
+- GitHub Actions CI/CD pipeline with lint, bash tests, TypeScript tests
+- Bash testing framework (bats) with 38 test cases
+- TypeScript tests for OpenCode plugin with vitest
 - Windsurf full-mode support with collection hook and injection workflow
 - Cursor enhanced basic mode with collection hook and manual context skill
+- OpenCode native skill distribution and static instructions
 - Comprehensive cross-agent compatibility documentation
-- SECURITY.md with vulnerability reporting guidelines
-- GitHub issue and PR templates
+- SECURITY.md with vulnerability reporting and data handling guidelines
+- GitHub issue templates (bug report, feature request, agent support)
+- GitHub pull request template
+- CODEOWNERS file
 
 ### Changed
 
 - Consolidated repository structure (removed duplicate root-level directories)
-- Improved OpenCode plugin with session correlation
+- Improved OpenCode plugin with crypto-based ID generation
+- Added session correlation via chat.headers hook
+- Updated README with compatibility matrix and troubleshooting
+- Updated architecture docs with multi-agent diagrams
 
 ### Fixed
 
-- CODE_OF_CONDUCT.md contact information
+- CODE_OF_CONDUCT.md contact information placeholder
 
 ## [4.0.0] - 2026-01-22
 
@@ -109,9 +117,11 @@ and this project adheres to
 - Installation script with dry-run support
 
 [Unreleased]:
-  https://github.com/AIntelligentTech/claude-response-boxes/compare/v4.0.0...HEAD
+  https://github.com/AIntelligentTech/agent-response-boxes/compare/v0.5.0...HEAD
+[0.5.0]:
+  https://github.com/AIntelligentTech/agent-response-boxes/compare/v4.0.0...v0.5.0
 [4.0.0]:
-  https://github.com/AIntelligentTech/claude-response-boxes/compare/v3.0.0...v4.0.0
+  https://github.com/AIntelligentTech/agent-response-boxes/compare/v3.0.0...v4.0.0
 [3.0.0]:
   https://github.com/AIntelligentTech/claude-response-boxes/compare/v2.1.0...v3.0.0
 [2.1.0]:

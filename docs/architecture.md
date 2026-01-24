@@ -1,9 +1,9 @@
+# Response Boxes Architecture
 
-
-**Version:** 4.0.0
+**Version:** 0.5.0
 
 This document defines the technical architecture of the Response Box System, an
-event-sourced metacognitive framework for Claude Code.
+event-sourced metacognitive framework for AI coding agents.
 
 ---
 
@@ -23,12 +23,101 @@ The knowledge model is intentionally three-tier:
 
 - **Boxes** — Raw, turn-level evidence captured during a session
 - **Learnings** — Patterns synthesized from many boxes (typically `level: 0`)
-- **Meta-learnings** — Higher-level principles that synthesize multiple learnings
-  (typically `level: 1+`)
+- **Meta-learnings** — Higher-level principles that synthesize multiple
+  learnings (typically `level: 1+`)
 
-For operational setup and workflow guidance (output style, rules, CLAUDE.md, hooks,
-and skill design), see **Best Practices: Integrating with Claude Code** in the
-project `README.md`.
+For operational setup and workflow guidance (output style, rules, CLAUDE.md,
+hooks, and skill design), see **Best Practices: Integrating with Claude Code**
+in the project `README.md`.
+
+---
+
+## Multi-Agent Architecture
+
+Response Boxes supports multiple AI coding agents through a shared event store.
+Each agent has adapters appropriate to its extension capabilities.
+
+### Agent Support Matrix
+
+| Agent       | Version Required | Collection            | Injection            | Analysis  |
+| ----------- | ---------------- | --------------------- | -------------------- | --------- |
+| Claude Code | Any              | ✅ SessionEnd hook    | ✅ SessionStart hook | ✅ Native |
+| OpenCode    | v1.1.34+         | ✅ Plugin event       | ✅ System transform  | ✅ Native |
+| Windsurf    | v1.12.41+        | ✅ post_cascade hook  | ⚠️ Manual workflow   | ⚠️ Via CC |
+| Cursor      | v1.7+            | ✅ afterAgentResponse | ⚠️ Manual skill      | ⚠️ Via CC |
+
+### Cross-Agent Data Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        MULTI-AGENT RESPONSE BOXES                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │
+│  │ Claude Code  │  │   OpenCode   │  │   Windsurf   │  │    Cursor    │    │
+│  │              │  │              │  │              │  │              │    │
+│  │ SessionEnd   │  │ message.     │  │ post_cascade │  │ afterAgent   │    │
+│  │ Hook         │  │ updated      │  │ _response    │  │ Response     │    │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘    │
+│         │                 │                 │                 │            │
+│         │   BoxCreated    │   BoxCreated    │   BoxCreated    │ BoxCreated │
+│         ▼                 ▼                 ▼                 ▼            │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                ~/.response-boxes/analytics/boxes.jsonl               │   │
+│  │                     (Shared Append-Only Event Store)                 │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│         │                 │                 │                 │            │
+│         │   Project &     │   Project &     │                 │            │
+│         │   Inject        │   Inject        │                 │            │
+│         ▼                 ▼                 ▼                 ▼            │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │
+│  │ SessionStart │  │ system.      │  │ /response-   │  │ /response-   │    │
+│  │ Hook         │  │ transform    │  │ boxes-start  │  │ boxes-       │    │
+│  │ (auto)       │  │ (auto)       │  │ (manual)     │  │ context      │    │
+│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘    │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Plugin/Hook API Stability
+
+| Agent       | API                     | Stability    | Notes                    |
+| ----------- | ----------------------- | ------------ | ------------------------ |
+| Claude Code | SessionStart/SessionEnd | Stable       | Core hook mechanism      |
+| OpenCode    | message.updated         | Stable       | Primary capture          |
+| OpenCode    | chat.system.transform   | Experimental | SessionID added Jan 2026 |
+| OpenCode    | chat.headers            | Stable       | Session correlation      |
+| Windsurf    | post_cascade_response   | Stable       | Observation only         |
+| Cursor      | afterAgentResponse      | Stable       | Observation only         |
+
+### Analysis Workflow (Cross-Agent)
+
+```
+User runs /analyze-boxes in Claude Code (or OpenCode)
+                    │
+                    ▼
+    ┌───────────────────────────────────┐
+    │  Load all events from boxes.jsonl │
+    │  (includes boxes from ALL agents) │
+    └───────────────┬───────────────────┘
+                    │
+                    ▼
+    ┌───────────────────────────────────┐
+    │  AI Analysis: Identify patterns   │
+    │  across all agents and sessions   │
+    └───────────────┬───────────────────┘
+                    │
+                    ▼
+    ┌───────────────────────────────────┐
+    │  User approves proposed learnings │
+    └───────────────┬───────────────────┘
+                    │
+                    ▼
+    ┌───────────────────────────────────┐
+    │  Append learning events to store  │
+    │  (available to ALL agents)        │
+    └───────────────────────────────────┘
+```
 
 ---
 
@@ -325,8 +414,8 @@ Marks the end of an analysis run.
 
 ### Compatibility and Breaking Changes
 
-- **Legacy support**: Older analytics lines that omit `event`/`id`/`box_type` are
-  treated as legacy BoxCreated data and normalized during projection.
+- **Legacy support**: Older analytics lines that omit `event`/`id`/`box_type`
+  are treated as legacy BoxCreated data and normalized during projection.
 - **Schema guardrail**: Hooks refuse to project if they see an event
   `schema_version` newer than they support, and inject a clear “please update”
   message rather than producing incorrect context.
@@ -340,7 +429,8 @@ Marks the end of an analysis run.
 - **Manual (human-in-the-loop)**
   - `/analyze-boxes` is user-invoked
   - Proposed events are reviewed and approved by the user before appending
-  - Analysis is nondeterministic (LLM pattern recognition); results may vary run-to-run
+  - Analysis is nondeterministic (LLM pattern recognition); results may vary
+    run-to-run
 
 Current state is derived by projecting events.
 
@@ -469,7 +559,8 @@ Where:
 
 **Process:**
 
-1. Check whether any `BoxCreated` events exist since the last `AnalysisCompleted`
+1. Check whether any `BoxCreated` events exist since the last
+   `AnalysisCompleted`
 2. If so, inject a one-line reminder to run `/analyze-boxes`
 3. Project all learnings from events
 4. Calculate effective confidence for each
@@ -645,7 +736,8 @@ issues:
 
 - Level 0: Direct patterns from boxes (base learnings)
 - Level 1+: Meta-learnings that synthesize multiple level-0 learnings
-- Hierarchy enables richer context injection (meta-learnings first, then specifics)
+- Hierarchy enables richer context injection (meta-learnings first, then
+  specifics)
 
 ### Why Strength and Relationship?
 
@@ -665,6 +757,63 @@ issues:
 
 ## File Structure
 
+### Repository Structure
+
+```
+agent-response-boxes/
+├── agents/
+│   ├── claude-code/
+│   │   ├── hooks/
+│   │   │   ├── inject-context.sh     # SessionStart: project and inject
+│   │   │   └── session-processor.sh  # SessionEnd: emit BoxCreated
+│   │   ├── output-styles/
+│   │   │   └── response-box.md       # Active output style
+│   │   ├── rules/
+│   │   │   └── response-boxes.md     # Complete specification
+│   │   ├── skills/
+│   │   │   └── analyze-boxes/SKILL.md
+│   │   └── config/
+│   │       └── claude-md-snippet.md
+│   ├── opencode/
+│   │   ├── plugins/
+│   │   │   └── response-boxes.plugin.ts
+│   │   ├── skills/
+│   │   │   └── analyze-boxes/SKILL.md
+│   │   └── instructions/
+│   │       └── response-boxes.md
+│   ├── windsurf/
+│   │   ├── hooks/
+│   │   │   ├── hooks.json
+│   │   │   └── windsurf-collector.sh
+│   │   ├── workflows/
+│   │   │   └── response-boxes-start.md
+│   │   └── rules/
+│   │       └── response-boxes.md
+│   └── cursor/
+│       ├── hooks/
+│       │   ├── hooks.json
+│       │   └── cursor-collector.sh
+│       ├── skills/
+│       │   └── response-boxes-context/SKILL.md
+│       └── rules/
+│           └── response-boxes.mdc
+├── tests/
+│   ├── hooks/
+│   │   ├── inject-context.bats
+│   │   └── session-processor.bats
+│   ├── installer/
+│   │   └── install.bats
+│   └── opencode/
+│       ├── box-extraction.test.ts
+│       └── context-injection.test.ts
+├── docs/
+│   ├── architecture.md
+│   └── cross-agent-compatibility.md
+└── install.sh
+```
+
+### Installed Files (User Level)
+
 ```
 ~/.claude/
 ├── hooks/
@@ -678,9 +827,15 @@ issues:
 │   └── analyze-boxes/
 │       └── SKILL.md             # AI-powered analysis skill
 
+~/.config/opencode/plugins/
+└── response-boxes.plugin.ts     # OpenCode plugin
+
 ~/.response-boxes/
-└── analytics/
-    └── boxes.jsonl              # Event store (single source of truth)
+├── analytics/
+│   └── boxes.jsonl              # Event store (single source of truth)
+└── hooks/
+    ├── windsurf-collector.sh    # Windsurf collection hook
+    └── cursor-collector.sh      # Cursor collection hook
 ```
 
 ---
@@ -765,6 +920,15 @@ Existing `boxes.jsonl` entries (if any) are compatible:
 ---
 
 ## Changelog
+
+- **v0.5.0** (2026-01-24): Multi-agent support
+  - Added OpenCode plugin with full collection and injection
+  - Added Windsurf hooks and workflow for enhanced mode
+  - Added Cursor hooks and skill for basic mode
+  - Added cross-agent compatibility documentation
+  - Added CI/CD pipeline with bats and vitest tests
+  - Added SECURITY.md for data handling policy
+  - Consolidated repository structure under agents/
 
 - **v4.0.0** (2026-01-22): Event-sourced architecture
   - Complete rewrite with event sourcing pattern
