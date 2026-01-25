@@ -9,6 +9,15 @@
 
 **Supported Agents:** Claude Code | OpenCode | Windsurf | Cursor
 
+### v0.6.0 Highlights
+
+- **Anti-sycophancy separated** — Now a sophisticated internal protocol based on
+  research (ELEPHANT, SMART, self-blinding studies). No visible 🪞 Sycophancy
+  box; operates during response generation. See
+  [`rules/anti-sycophancy.md`](agents/claude-code/rules/anti-sycophancy.md).
+- **12 box types** (down from 13) — Sycophancy removed from taxonomy
+- **Cleaner responses** — No mandatory end-of-response self-assessment box
+
 ---
 
 ## Agent Compatibility
@@ -240,7 +249,8 @@ Or set as default in `~/.claude/settings.json`:
 ├── output-styles/
 │   └── response-box.md           # Active output style
 ├── rules/
-│   └── response-boxes.md         # Complete specification
+│   ├── response-boxes.md         # Complete specification (12 box types)
+│   └── anti-sycophancy.md        # Research-backed anti-sycophancy protocol
 ├── hooks/
 │   ├── inject-context.sh         # SessionStart: load prior boxes
 │   └── session-processor.sh      # SessionEnd: collect and emit box events
@@ -258,7 +268,8 @@ Or set as default in `~/.claude/settings.json`:
 ```text
 .claude/
 ├── rules/
-│   └── response-boxes.md         # Full specification
+│   ├── response-boxes.md         # Full specification
+│   └── anti-sycophancy.md        # Anti-sycophancy protocol
 └── CLAUDE.md                     # Updated with snippet
 ```
 
@@ -309,7 +320,7 @@ Boxes are scored by type, prioritizing actionable learnings:
 | ------ | ------------------------------------------------- | ----- |
 | High   | Reflection, Warning, Pushback, Assumption         | 80-90 |
 | Medium | Choice, Completion, Concern, Confidence, Decision | 55-70 |
-| Low    | Sycophancy, Suggestion, Quality, FollowUps        | 35-50 |
+| Low    | Suggestion, Quality, FollowUps                    | 35-50 |
 
 ### What Gets Injected
 
@@ -643,7 +654,7 @@ Once installed and configured:
 
 1. Open a project in OpenCode and start a coding session.
 2. Write responses using the Response Box format (Choice, Completion,
-   Sycophancy, etc.) just as you would in Claude Code.
+   Assumption, etc.) just as you would in Claude Code.
 3. The OpenCode plugin will:
    - Parse your assistant responses for boxes.
    - Append `BoxCreated` events into `~/.response-boxes/analytics/boxes.jsonl`
@@ -731,7 +742,9 @@ For more troubleshooting, see the
 - **[Cross-Agent Compatibility](docs/cross-agent-compatibility.md)** — Detailed
   agent capability matrices and integration patterns
 - **[Rules](agents/claude-code/rules/response-boxes.md)** — Complete box
-  specifications and usage guidelines
+  specifications and usage guidelines (12 box types)
+- **[Anti-Sycophancy](agents/claude-code/rules/anti-sycophancy.md)** —
+  Research-backed protocol for preventing sycophantic behavior
 - **[Security](SECURITY.md)** — Security policy and data handling
 
 ---
