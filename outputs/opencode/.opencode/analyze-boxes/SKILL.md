@@ -1,13 +1,7 @@
 ---
-name: analyze-boxes
 description: AI-powered analysis of response boxes to create learnings and link evidence
-disable-model-invocation: true
-allowed-tools:
-  - Read
-  - Grep
-  - Glob
-  - Bash
 ---
+<!-- Converted from claude to OpenCode -->
 
 # /analyze-boxes Skill
 

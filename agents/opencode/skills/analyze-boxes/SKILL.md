@@ -2,7 +2,11 @@
 name: analyze-boxes
 description: AI-powered analysis of response boxes to create learnings and link evidence
 disable-model-invocation: true
-allowed-tools: Read, Grep, Glob, Bash
+allowed-tools:
+  - Read
+  - Grep
+  - Glob
+  - Bash
 ---
 
 # /analyze-boxes Skill

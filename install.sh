@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 #
-# Claude Response Boxes - Installer v4.0
+# Agent Response Boxes - Installer v5.0
 #
 # A metacognitive annotation system for Claude Code responses with
 # cross-session learning capabilities.
 #
 # QUICK INSTALL (user-level):
-#   curl -sSL https://raw.githubusercontent.com/AIntelligentTech/claude-response-boxes/main/install.sh | bash
+#   curl -sSL https://raw.githubusercontent.com/AIntelligentTech/agent-response-boxes/main/install.sh | bash
 #
 # PROJECT-LEVEL INSTALL:
-#   curl -sSL https://raw.githubusercontent.com/AIntelligentTech/claude-response-boxes/main/install.sh | bash -s -- --project
+#   curl -sSL https://raw.githubusercontent.com/AIntelligentTech/agent-response-boxes/main/install.sh | bash -s -- --project
 #
 # OPTIONS:
 #   --user               Install to ~/.claude/ (DEFAULT)
@@ -28,8 +28,11 @@ set -euo pipefail
 # Configuration
 # ─────────────────────────────────────────────────────────────────────────────
 
-RAW_URL="https://raw.githubusercontent.com/AIntelligentTech/claude-response-boxes/main"
-VERSION="0.6.0"
+PRIMARY_RAW_URL="https://raw.githubusercontent.com/AIntelligentTech/agent-response-boxes/main"
+# Back-compat while the repo is being renamed on GitHub.
+LEGACY_RAW_URL="https://raw.githubusercontent.com/AIntelligentTech/claude-response-boxes/main"
+RAW_URL="${PRIMARY_RAW_URL}"
+VERSION="0.7.0"
 
 USER_CLAUDE_DIR="${HOME}/.claude"
 PROJECT_CLAUDE_DIR="./.claude"
@@ -98,7 +101,7 @@ error() { echo -e "${RED}✖${NC} $*" >&2; }
 header() {
     echo ""
     echo -e "${BOLD}══════════════════════════════════════════════════════════════${NC}"
-    echo -e "${BOLD}        Claude Response Boxes v${VERSION}${NC}"
+    echo -e "${BOLD}        Agent Response Boxes v${VERSION}${NC}"
     echo -e "${BOLD}══════════════════════════════════════════════════════════════${NC}"
     echo ""
 }
@@ -130,11 +133,11 @@ parse_args() {
 
 show_help() {
     cat <<'EOF'
-Claude Response Boxes - Installer
+Agent Response Boxes - Installer
 
 USAGE:
-  curl -sSL https://raw.githubusercontent.com/AIntelligentTech/claude-response-boxes/main/install.sh | bash
-  curl -sSL https://raw.githubusercontent.com/AIntelligentTech/claude-response-boxes/main/install.sh | bash -s -- --project
+  curl -sSL https://raw.githubusercontent.com/AIntelligentTech/agent-response-boxes/main/install.sh | bash
+  curl -sSL https://raw.githubusercontent.com/AIntelligentTech/agent-response-boxes/main/install.sh | bash -s -- --project
 
 OPTIONS:
   --user             Install to ~/.claude/ (DEFAULT)
@@ -180,6 +183,18 @@ detect_source() {
 
 is_local_source_dir() {
     local dir="$1"
+    # Preferred (build-time) layout: committed outputs/ tree.
+    local outputs_base="${dir}/outputs/claude/.claude"
+    if [[ -f "${outputs_base}/output-styles/response-box.md" ]] \
+        && [[ -f "${outputs_base}/rules/response-boxes.md" ]] \
+        && [[ -f "${outputs_base}/rules/anti-sycophancy.md" ]] \
+        && [[ -f "${outputs_base}/hooks/inject-context.sh" ]] \
+        && [[ -f "${outputs_base}/hooks/session-processor.sh" ]] \
+        && [[ -f "${outputs_base}/skills/analyze-boxes/SKILL.md" ]]; then
+        return 0
+    fi
+
+    # Legacy (source) layout: agents/ tree.
     local base="${dir}/agents/claude-code"
     [[ -f "${base}/output-styles/response-box.md" ]] || return 1
     [[ -f "${base}/rules/response-boxes.md" ]] || return 1
@@ -222,6 +237,7 @@ file_looks_managed() {
             ;;
     esac
 
+    grep -q "agent-response-boxes" "$file" 2>/dev/null && return 0
     grep -q "claude-response-boxes" "$file" 2>/dev/null && return 0
     grep -q "Claude Response Boxes" "$file" 2>/dev/null && return 0
 
@@ -236,7 +252,10 @@ fetch_to_temp() {
     if [[ "${SOURCE}" == "local" ]]; then
         cp "${SOURCE_DIR}/${src}" "$tmp"
     else
-        curl -fsSL "${RAW_URL}/${src}" -o "$tmp"
+        # Prefer the new repo name, but fall back during transition.
+        if ! curl -fsSL "${PRIMARY_RAW_URL}/${src}" -o "$tmp"; then
+            curl -fsSL "${LEGACY_RAW_URL}/${src}" -o "$tmp"
+        fi
     fi
 
     echo "$tmp"
@@ -498,25 +517,25 @@ check_curl() {
 
 install_output_style() {
     log "Installing output style..."
-    install_managed_file "agents/claude-code/output-styles/response-box.md" "${USER_CLAUDE_DIR}/output-styles/response-box.md"
+    install_managed_file "outputs/claude/.claude/output-styles/response-box.md" "${USER_CLAUDE_DIR}/output-styles/response-box.md"
 }
 
 install_rules() {
     log "Installing rules..."
-    install_managed_file "agents/claude-code/rules/response-boxes.md" "${CLAUDE_DIR}/rules/response-boxes.md"
-    install_managed_file "agents/claude-code/rules/anti-sycophancy.md" "${CLAUDE_DIR}/rules/anti-sycophancy.md"
+    install_managed_file "outputs/claude/.claude/rules/response-boxes.md" "${CLAUDE_DIR}/rules/response-boxes.md"
+    install_managed_file "outputs/claude/.claude/rules/anti-sycophancy.md" "${CLAUDE_DIR}/rules/anti-sycophancy.md"
 }
 
 install_hooks() {
     log "Installing hooks..."
-    install_managed_file "agents/claude-code/hooks/inject-context.sh" "${USER_CLAUDE_DIR}/hooks/inject-context.sh" "+x"
+    install_managed_file "outputs/claude/.claude/hooks/inject-context.sh" "${USER_CLAUDE_DIR}/hooks/inject-context.sh" "+x"
 
-    install_managed_file "agents/claude-code/hooks/session-processor.sh" "${USER_CLAUDE_DIR}/hooks/session-processor.sh" "+x"
+    install_managed_file "outputs/claude/.claude/hooks/session-processor.sh" "${USER_CLAUDE_DIR}/hooks/session-processor.sh" "+x"
 }
 
 install_skills() {
     log "Installing skills..."
-    install_managed_file "agents/claude-code/skills/analyze-boxes/SKILL.md" "${USER_CLAUDE_DIR}/skills/analyze-boxes/SKILL.md"
+    install_managed_file "outputs/claude/.claude/skills/analyze-boxes/SKILL.md" "${USER_CLAUDE_DIR}/skills/analyze-boxes/SKILL.md"
 }
 
 create_analytics_dir() {
@@ -627,7 +646,7 @@ install_claude_md_snippet() {
     fi
 
     local snippet_tmp
-    snippet_tmp="$(fetch_to_temp "agents/claude-code/config/claude-md-snippet.md")"
+    snippet_tmp="$(fetch_to_temp "outputs/claude/.claude/config/claude-md-snippet.md")"
 
     if snippet_exists "$claude_md"; then
         log "Updating Response Box snippet in CLAUDE.md..."
@@ -674,7 +693,7 @@ install_opencode_plugin() {
     fi
 
     log "Installing OpenCode plugin..."
-    install_managed_file "agents/opencode/plugins/response-boxes.plugin.ts" "${USER_OPENCODE_PLUGIN_DIR}/response-boxes.plugin.ts"
+    install_managed_file "outputs/opencode/.opencode/plugins/response-boxes.plugin.ts" "${USER_OPENCODE_PLUGIN_DIR}/response-boxes.plugin.ts"
 }
 
 install_windsurf_basic() {
@@ -698,7 +717,7 @@ install_windsurf_basic() {
         fi
 
         local tmp_template
-        tmp_template="$(fetch_to_temp "agents/windsurf/rules/response-boxes.md")"
+        tmp_template="$(fetch_to_temp "outputs/windsurf/.windsurf/rules/response-boxes.md")"
 
         for global_rules in "${global_targets[@]}"; do
             run_cmd mkdir -p "$(dirname "$global_rules")"
@@ -738,7 +757,7 @@ install_windsurf_basic() {
         # Project-level: install a dedicated rule file under .windsurf/rules/
         local dst=".windsurf/rules/response-boxes.md"
         log "Installing Windsurf basic-mode rule into project: ${dst}"
-        install_managed_file "agents/windsurf/rules/response-boxes.md" "$dst"
+        install_managed_file "outputs/windsurf/.windsurf/rules/response-boxes.md" "$dst"
     fi
 }
 
@@ -757,7 +776,7 @@ install_cursor_basic() {
     fi
 
     log "Installing Cursor basic-mode rule into project: ${dst}"
-    install_managed_file "agents/cursor/rules/response-boxes.mdc" "$dst"
+    install_managed_file "outputs/cursor/.cursor/rules/response-boxes.mdc" "$dst"
 }
 
 install_cursor_enhanced() {
@@ -773,16 +792,16 @@ install_cursor_enhanced() {
     run_cmd mkdir -p "$cursor_hooks_dir"
 
     # Install the collector hook script
-    install_managed_file "agents/cursor/hooks/cursor-collector.sh" "${cursor_hooks_dir}/cursor-collector.sh" "+x"
+    install_managed_file "outputs/cursor/.cursor/hooks/cursor-collector.sh" "${cursor_hooks_dir}/cursor-collector.sh" "+x"
 
     # Cursor hooks.json needs to be in project-level .cursor/hooks/
     # We'll install the template to the response-boxes directory for reference
-    install_managed_file "agents/cursor/hooks/hooks.json" "${HOME}/.response-boxes/cursor-hooks.json"
+    install_managed_file "outputs/cursor/.cursor/hooks/hooks.json" "${HOME}/.response-boxes/cursor-hooks.json"
 
     # Install the skill to user-level (Cursor can read from ~/.cursor/skills/)
     local cursor_skills_dir="${HOME}/.cursor/skills/response-boxes-context"
     run_cmd mkdir -p "$cursor_skills_dir"
-    install_managed_file "agents/cursor/skills/response-boxes-context/SKILL.md" "${cursor_skills_dir}/SKILL.md"
+    install_managed_file "outputs/cursor/.cursor/skills/response-boxes-context/SKILL.md" "${cursor_skills_dir}/SKILL.md"
 
     log "Cursor enhanced mode installation complete"
     info "IMPORTANT: Cursor hooks are project-level. Copy ~/.response-boxes/cursor-hooks.json"
@@ -811,7 +830,7 @@ install_windsurf_full() {
     run_cmd mkdir -p "$windsurf_hooks_dir"
 
     # Install the collector hook script
-    install_managed_file "agents/windsurf/hooks/windsurf-collector.sh" "${windsurf_hooks_dir}/windsurf-collector.sh" "+x"
+    install_managed_file "outputs/windsurf/.windsurf/hooks/windsurf-collector.sh" "${windsurf_hooks_dir}/windsurf-collector.sh" "+x"
 
     # Install hooks.json and workflow to each Windsurf config location that exists
     for config_dir in "${windsurf_config_dirs[@]}"; do
@@ -840,7 +859,7 @@ EOF
             # Install workflow
             windsurf_workflow_dir="${config_dir}/workflows"
             run_cmd mkdir -p "$windsurf_workflow_dir"
-            install_managed_file "agents/windsurf/workflows/response-boxes-start.md" "${windsurf_workflow_dir}/response-boxes-start.md"
+            install_managed_file "outputs/windsurf/.windsurf/workflows/response-boxes-start.md" "${windsurf_workflow_dir}/response-boxes-start.md"
         fi
     done
 
@@ -857,7 +876,7 @@ EOF
 
 uninstall() {
     echo ""
-    echo -e "${BOLD}Uninstalling Claude Response Boxes...${NC}"
+    echo -e "${BOLD}Uninstalling Agent Response Boxes...${NC}"
     echo ""
 
     local files_to_remove=(
@@ -1048,7 +1067,7 @@ main() {
     echo "  • Output Style: ~/.claude/output-styles/response-box.md"
     echo "  • Rules:        ${CLAUDE_DIR}/rules/response-boxes.md"
     echo "  • CLAUDE.md:    Updated with pre-response checklist"
-    if [[ "$INSTALL_SCOPE" == "user" ]]; then
+    if [[ "$INSTALL_SCOPE" == "user" ]] && [[ "$INSTALL_MODE" == "full" ]]; then
         echo "  • Hooks:        ~/.claude/hooks/"
         echo "  • Skills:       ~/.claude/skills/analyze-boxes/"
         echo "  • Analytics:    ~/.response-boxes/analytics/"
@@ -1060,7 +1079,7 @@ main() {
     echo "Or set as default in ~/.claude/settings.json:"
     echo "  { \"outputStyle\": \"response-box\" }"
     echo ""
-    if [[ "$INSTALL_SCOPE" == "user" ]]; then
+    if [[ "$INSTALL_SCOPE" == "user" ]] && [[ "$INSTALL_MODE" == "full" ]]; then
         echo "Cross-session learning:"
         echo "  Boxes are automatically collected at session end"
         echo "  High-value learnings are injected at session start"

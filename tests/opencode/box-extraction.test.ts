@@ -11,7 +11,11 @@ function extractBoxesFromText(text: string): BoxSegment[] {
   const segments: BoxSegment[] = [];
 
   // Match headers like: "⚖️ Choice ─────────────" (emoji + type + dashes)
-  const headerPattern = /^(.+?)\s+([A-Za-z][A-Za-z ]*)\s+[-\u2500]{10,}\s*$/gm;
+  //
+  // IMPORTANT: do not allow newlines between groups. `\s` includes `\n`, which
+  // causes false matches like "**Reasoning:** ...\n──────".
+  const headerPattern =
+    /^([^\s]+)[ \t]+([A-Za-z][A-Za-z ]*)[ \t]+[-\u2500]{10,}[ \t]*$/gm;
 
   const matches = Array.from(text.matchAll(headerPattern));
   if (matches.length === 0) {
@@ -43,14 +47,32 @@ function extractBoxesFromText(text: string): BoxSegment[] {
       headerLineEnd === -1 ? "" : block.slice(headerLineEnd + 1).trim();
     const fields: Record<string, string> = {};
 
-    const fieldPattern = /\*\*([^*]+)\*\*:\s*(.+)/g;
-    let fieldMatch: RegExpExecArray | null;
-    while ((fieldMatch = fieldPattern.exec(body)) !== null) {
-      const rawName = fieldMatch[1]?.trim();
-      const value = fieldMatch[2]?.trim() ?? "";
+    for (const line of body.split(/\r?\n/)) {
+      const matchField = /^\*\*([^*]+)\*\*(.*)$/.exec(line);
+      if (!matchField) {
+        continue;
+      }
+
+      let rawName = (matchField[1] ?? "").trim();
+      let remainder = (matchField[2] ?? "");
+
+      // Support both formats:
+      // - **Name:** value   (colon inside bold)
+      // - **Name**: value   (colon outside bold)
+      let value = remainder.trimStart();
+      if (rawName.endsWith(":")) {
+        rawName = rawName.slice(0, -1).trim();
+      } else if (value.startsWith(":")) {
+        value = value.slice(1).trimStart();
+      } else {
+        continue;
+      }
+
+      value = value.trim();
       if (!rawName || value === "") {
         continue;
       }
+
       const key = rawName.toLowerCase().replace(/\s+/g, "_");
       if (!(key in fields)) {
         fields[key] = value;

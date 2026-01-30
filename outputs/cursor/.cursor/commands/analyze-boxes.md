@@ -1,13 +1,12 @@
----
-name: analyze-boxes
-description: AI-powered analysis of response boxes to create learnings and link evidence
-disable-model-invocation: true
-allowed-tools:
-  - Read
-  - Grep
-  - Glob
-  - Bash
----
+<!-- Converted from claude to Cursor -->
+
+# Analyze Boxes
+
+## Objective
+
+AI-powered analysis of response boxes to create learnings and link evidence
+
+## Requirements
 
 # /analyze-boxes Skill
 

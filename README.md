@@ -5,7 +5,7 @@
 
 [![CI](https://github.com/AIntelligentTech/agent-response-boxes/actions/workflows/ci.yml/badge.svg)](https://github.com/AIntelligentTech/agent-response-boxes/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.6.0-green.svg)](https://github.com/AIntelligentTech/agent-response-boxes/releases)
+[![Version](https://img.shields.io/badge/version-0.7.0-green.svg)](https://github.com/AIntelligentTech/agent-response-boxes/releases)
 
 **Supported Agents:** Claude Code | OpenCode | Windsurf | Cursor
 
@@ -177,7 +177,7 @@ context, enabling Claude to apply past corrections and preferences immediately.
 ### Quick Install (User-Level)
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/AIntelligentTech/claude-response-boxes/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/AIntelligentTech/agent-response-boxes/main/install.sh | bash
 ```
 
 This installs:
@@ -190,7 +190,7 @@ This installs:
 ### Project-Level Install
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/AIntelligentTech/claude-response-boxes/main/install.sh | bash -s -- --project
+curl -sSL https://raw.githubusercontent.com/AIntelligentTech/agent-response-boxes/main/install.sh | bash -s -- --project
 ```
 
 Installs rules to project `.claude/` directory only. Hooks, skills, and
@@ -200,13 +200,13 @@ analytics remain user-level.
 
 ```bash
 # Preview changes without modifying files
-curl -sSL https://raw.githubusercontent.com/AIntelligentTech/claude-response-boxes/main/install.sh | bash -s -- --dry-run
+curl -sSL https://raw.githubusercontent.com/AIntelligentTech/agent-response-boxes/main/install.sh | bash -s -- --dry-run
 
 # Overwrite managed files
-curl -sSL https://raw.githubusercontent.com/AIntelligentTech/claude-response-boxes/main/install.sh | bash -s -- --force
+curl -sSL https://raw.githubusercontent.com/AIntelligentTech/agent-response-boxes/main/install.sh | bash -s -- --force
 
 # Remove legacy v3 artifacts (if present)
-curl -sSL https://raw.githubusercontent.com/AIntelligentTech/claude-response-boxes/main/install.sh | bash -s -- --cleanup-legacy
+curl -sSL https://raw.githubusercontent.com/AIntelligentTech/agent-response-boxes/main/install.sh | bash -s -- --cleanup-legacy
 ```
 
 ### Installer Coverage

@@ -1,12 +1,33 @@
 # Changelog
 
-All notable changes to Claude Response Boxes will be documented in this file.
+All notable changes to Agent Response Boxes will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.7.0] - 2026-01-30
+
+### Changed
+
+- **Rename (pending GitHub rename):** `claude-response-boxes` → `agent-response-boxes`
+- **Build-time outputs:** Added `bin/cace-build` to generate a committed `outputs/`
+  tree using CACE (install no longer depends on `agents/` layout)
+- **Installer sources from `outputs/`:** Installer now fetches and installs from
+  the committed `outputs/` tree, with a temporary raw URL fallback during the
+  repo rename window
+- **Cursor rules quality:** Added `.mdc` frontmatter and explicit “always follow”
+  instruction; validated with CACE against Cursor v2.4 rules expectations
+
+### Fixed
+
+- **OpenCode plugin parsing:** Prevent false header matches caused by newline
+  whitespace and support both `**Field:** value` and `**Field**: value` formats
+- **CACE validation noise:** Converted `allowed-tools` to a proper YAML list in
+  `analyze-boxes` skills
+- **Installer basic-mode summary:** No longer lists hooks/skills/analytics as installed
 
 ## [0.6.0] - 2026-01-25
 
@@ -153,16 +174,20 @@ Historical Sycophancy boxes remain in the event store but are not projected.
 - Installation script with dry-run support
 
 [Unreleased]:
-  https://github.com/AIntelligentTech/agent-response-boxes/compare/v0.5.0...HEAD
+  https://github.com/AIntelligentTech/agent-response-boxes/compare/v0.7.0...HEAD
+[0.7.0]:
+  https://github.com/AIntelligentTech/agent-response-boxes/compare/v0.6.0...v0.7.0
+[0.6.0]:
+  https://github.com/AIntelligentTech/agent-response-boxes/compare/v0.5.0...v0.6.0
 [0.5.0]:
   https://github.com/AIntelligentTech/agent-response-boxes/compare/v4.0.0...v0.5.0
 [4.0.0]:
   https://github.com/AIntelligentTech/agent-response-boxes/compare/v3.0.0...v4.0.0
 [3.0.0]:
-  https://github.com/AIntelligentTech/claude-response-boxes/compare/v2.1.0...v3.0.0
+  https://github.com/AIntelligentTech/agent-response-boxes/compare/v2.1.0...v3.0.0
 [2.1.0]:
-  https://github.com/AIntelligentTech/claude-response-boxes/compare/v2.0.0...v2.1.0
+  https://github.com/AIntelligentTech/agent-response-boxes/compare/v2.0.0...v2.1.0
 [2.0.0]:
-  https://github.com/AIntelligentTech/claude-response-boxes/compare/v1.0.0...v2.0.0
+  https://github.com/AIntelligentTech/agent-response-boxes/compare/v1.0.0...v2.0.0
 [1.0.0]:
-  https://github.com/AIntelligentTech/claude-response-boxes/releases/tag/v1.0.0
+  https://github.com/AIntelligentTech/agent-response-boxes/releases/tag/v1.0.0

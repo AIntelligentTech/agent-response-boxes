@@ -1,0 +1,9 @@
+{
+  "$schema": "https://docs.windsurf.com/schemas/hooks.json",
+  "hooks": {
+    "post_cascade_response": {
+      "command": "~/.response-boxes/hooks/windsurf-collector.sh",
+      "description": "Collect response boxes from Cascade responses and emit BoxCreated events"
+    }
+  }
+}

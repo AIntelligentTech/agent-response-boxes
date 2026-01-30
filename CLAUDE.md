@@ -1,6 +1,6 @@
 # Response Boxes - Project Instructions
 
-**Version:** 0.6.0 **Type:** Multi-agent metacognitive annotation system
+**Version:** 0.7.0 **Type:** Multi-agent metacognitive annotation system
 
 ---
 
@@ -151,7 +151,25 @@ Follow conventional commits:
 
 ---
 
-## v0.6.0 Changes (Current)
+## v0.7.0 Changes (Current)
+
+### Build-time outputs (CACE)
+
+This repository now commits an `outputs/` directory generated with CACE:
+
+```bash
+./bin/cace-build
+git diff outputs/
+```
+
+The installer installs from `outputs/` (preferred) to keep installs stable and
+offline-friendly.
+
+### Repository rename (pending)
+
+This repository is being renamed from `claude-response-boxes` to
+`agent-response-boxes`. The installer includes a temporary raw URL fallback to
+handle the transition.
 
 ### Breaking Changes
 

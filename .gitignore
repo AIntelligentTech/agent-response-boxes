@@ -14,6 +14,9 @@ Thumbs.db
 *.swo
 *~
 
+# Dependencies
+node_modules/
+
 # Test output
 *.log
 tmp/

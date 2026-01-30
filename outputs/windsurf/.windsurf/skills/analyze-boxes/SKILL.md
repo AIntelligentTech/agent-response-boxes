@@ -1,14 +1,16 @@
+<!-- Converted from claude to Claude Code -->
+
 ---
 name: analyze-boxes
 description: AI-powered analysis of response boxes to create learnings and link evidence
 disable-model-invocation: true
+user-invocable: true
 allowed-tools:
   - Read
   - Grep
   - Glob
   - Bash
 ---
-
 # /analyze-boxes Skill
 
 AI-powered analysis of response boxes to identify patterns, create learnings,

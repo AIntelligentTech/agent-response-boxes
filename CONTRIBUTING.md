@@ -1,4 +1,4 @@
-# Contributing to Claude Response Boxes
+# Contributing to Agent Response Boxes
 
 Thank you for your interest in contributing! This document provides guidelines
 for contributing to the project.
@@ -60,11 +60,21 @@ echo '{"session_id":"test","transcript_path":"/tmp/does-not-exist","cwd":"'"$PWD
 ## Development Setup
 
 ```bash
-git clone https://github.com/AIntelligentTech/claude-response-boxes.git
-cd claude-response-boxes
+git clone https://github.com/AIntelligentTech/agent-response-boxes.git
+cd agent-response-boxes
 
 # Make scripts executable
 chmod +x install.sh agents/claude-code/hooks/*.sh
+```
+
+### Regenerating build-time outputs
+
+This repo commits an `outputs/` directory generated with CACE (build-time) so
+end users can install without needing CACE locally.
+
+```bash
+./bin/cace-build
+git diff outputs/
 ```
 
 ## Questions?
