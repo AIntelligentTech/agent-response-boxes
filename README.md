@@ -5,11 +5,11 @@
 
 [![CI](https://github.com/AIntelligentTech/agent-response-boxes/actions/workflows/ci.yml/badge.svg)](https://github.com/AIntelligentTech/agent-response-boxes/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.7.0-green.svg)](https://github.com/AIntelligentTech/agent-response-boxes/releases)
+[![Version](https://img.shields.io/badge/version-0.7.1-green.svg)](https://github.com/AIntelligentTech/agent-response-boxes/releases)
 
 **Supported Agents:** Claude Code | OpenCode | Windsurf | Cursor
 
-### v0.6.0 Highlights
+### v0.7.1 Highlights
 
 - **Anti-sycophancy separated** — Now a sophisticated internal protocol based on
   research (ELEPHANT, SMART, self-blinding studies). No visible 🪞 Sycophancy

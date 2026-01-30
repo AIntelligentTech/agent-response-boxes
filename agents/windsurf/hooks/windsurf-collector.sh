@@ -111,11 +111,32 @@ extract_boxes() {
 # Parse field values from box content
 parse_fields() {
     local content="$1"
-    echo "$content" | grep -oE '\*\*[^*]+\*\*:[^*]+' | while read -r field; do
-        key=$(echo "$field" | sed -E 's/\*\*([^*]+)\*\*:.*/\1/' | tr '[:upper:]' '[:lower:]' | tr ' ' '_')
-        value=$(echo "$field" | sed -E 's/\*\*[^*]+\*\*:[[:space:]]*//')
-        echo "\"$key\":\"$value\""
-    done | paste -sd, -
+
+    # Support both formats:
+    # - **Field:** value   (colon inside bold; canonical)
+    # - **Field**: value   (colon outside bold)
+    local fields='{}'
+    while IFS= read -r line; do
+        local field_name=""
+        local field_value=""
+
+        if [[ "$line" =~ ^\*\*([^*]+):\*\*[[:space:]]*(.+)$ ]]; then
+            field_name="${BASH_REMATCH[1]}"
+            field_value="${BASH_REMATCH[2]}"
+        elif [[ "$line" =~ ^\*\*([^*]+)\*\*:[[:space:]]*(.+)$ ]]; then
+            field_name="${BASH_REMATCH[1]}"
+            field_value="${BASH_REMATCH[2]}"
+        else
+            continue
+        fi
+
+        field_name="$(echo "$field_name" | tr '[:upper:]' '[:lower:]' | tr ' ' '_' )"
+        # Escape quotes for JSON string safety
+        field_value="$(echo "$field_value" | sed 's/"/\\"/g')"
+        fields="$(echo "$fields" | jq --arg k "$field_name" --arg v "$field_value" '. + {($k): $v}')"
+    done <<< "$content"
+
+    echo "$fields"
 }
 
 # Calculate initial score based on box type
@@ -156,11 +177,9 @@ while IFS=$'\t' read -r box_type box_content; do
     fi
 
     # Parse fields from content
-    fields_json=$(parse_fields "$box_content")
+    fields_json="$(parse_fields "$box_content")"
     if [[ -z "$fields_json" ]]; then
         fields_json="{}"
-    else
-        fields_json="{$fields_json}"
     fi
 
     # Calculate score

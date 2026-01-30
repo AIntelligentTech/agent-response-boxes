@@ -8,6 +8,15 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-01-30
+
+### Fixed
+
+- **Tier A parity:** Fix Windsurf + Cursor collectors to correctly extract box
+  fields from the canonical `**Field:** value` format (and still accept
+  `**Field**: value`), so `BoxCreated.fields` is consistent across agents
+  (improves cross-session learning projections)
+
 ## [0.7.0] - 2026-01-30
 
 ### Changed
@@ -174,7 +183,9 @@ Historical Sycophancy boxes remain in the event store but are not projected.
 - Installation script with dry-run support
 
 [Unreleased]:
-  https://github.com/AIntelligentTech/agent-response-boxes/compare/v0.7.0...HEAD
+  https://github.com/AIntelligentTech/agent-response-boxes/compare/v0.7.1...HEAD
+[0.7.1]:
+  https://github.com/AIntelligentTech/agent-response-boxes/compare/v0.7.0...v0.7.1
 [0.7.0]:
   https://github.com/AIntelligentTech/agent-response-boxes/compare/v0.6.0...v0.7.0
 [0.6.0]:
